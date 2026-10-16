@@ -336,7 +336,7 @@ function greeting() { const h = new Date().getHours(); return h < 12 ? "Good mor
 /* ---------- Today ---------- */
 function renderToday() {
   const s = streakNow(); const wk = ST.week; const k = wk ? wk.key : weekKey(); const ids = weekIds();
-  const needIntro = wk && !wk.introDone; const locked = ST.lock && ST.lock.on; const qd = quizDoneToday();
+  const needIntro = wk && !wk.introDone && !IS_OWNER; const locked = ST.lock && ST.lock.on && !IS_OWNER; const qd = quizDoneToday();
   const trained = wk ? (wk.trained || []).length : 0; const mastered = ids.filter(isMastered).length;
   const days = []; for (let i = 0; i < 7; i++) { const d = addDays(k, i); const dt = new Date(d + "T12:00:00");
     days.push(`<div class="wday ${(ST.quizDays || []).includes(d) ? "done" : ""} ${d === today() ? "today" : ""}">${DOW[dt.getDay()].slice(0, 2)}<i>${(ST.quizDays || []).includes(d) ? "✓" : dt.getDate()}</i></div>`); }
@@ -649,8 +649,20 @@ function renderTrainDone() { const r = view.reason;
 /* ---------- speaking ---------- */
 const speakOn = () => CFG.speak !== false && !srBroken;
 const toks = x => norm(x).replace(/[’']/g, "").replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
-function wordHeard(alts, w) { const t = toks(w).join(""); const forms = [t, t + "s", t + "es", t + "ed", t + "d", t + "ing"];
-  return alts.some(a => { const A = toks(a); return A.some(x => forms.includes(x)) || A.join("") === t; }); }
+function phKey(s) { // rough sound-alike key
+  s = s.toLowerCase().replace(/[^a-z]/g, ""); if (!s) return "";
+  s = s.replace(/^kn|^gn|^wr/, m => m[1]).replace(/ph/g, "f").replace(/ck|q/g, "k").replace(/c(?=[eiy])/g, "s").replace(/c/g, "k").replace(/x/g, "ks").replace(/z/g, "s").replace(/dg/g, "j").replace(/tch/g, "ch").replace(/gh/g, "").replace(/wh/g, "w").replace(/(.)\1+/g, "$1");
+  return s[0] + s.slice(1).replace(/[aeiouyhw]/g, "");
+}
+function soundsLike(tok, w) { const t = toks(w).join(""); if (!tok) return false;
+  const forms = [t, t + "s", t + "es", t + "ed", t + "d", t + "ing"]; if (forms.includes(tok)) return true;
+  if (tok[0] !== t[0] && phKey(tok)[0] !== phKey(t)[0]) return false;
+  if (lev(tok, t) <= (t.length <= 5 ? 1 : t.length <= 8 ? 2 : 3)) return true;
+  return phKey(tok) === phKey(t) && Math.abs(tok.length - t.length) <= 2; }
+function countHeard(text, w) { const A = toks(text), parts = toks(w); let n = 0;
+  for (let i = 0; i < A.length; i++) { if (soundsLike(A[i], w)) { n++; continue; } if (parts.length === 1 && i + 1 < A.length && soundsLike(A[i] + A[i + 1], w)) { n++; i++; } }
+  if (!n && soundsLike(A.join(""), w)) n = 1; return n; }
+function wordHeard(alts, w) { return alts.some(a => countHeard(a, w) > 0); }
 function lcsLen(A, B) { const L = Array.from({ length: A.length + 1 }, () => new Array(B.length + 1).fill(0));
   for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]); return L[0][0]; }
 function sentHeard(alts, sent) { const B = toks(sent); return alts.some(a => lcsLen(toks(a), B) / B.length >= 0.75); }
@@ -662,22 +674,42 @@ function speakHtml(e) {
   const list = sp.targets.map((t, k) => `<span class="pill ${k < sp.idx ? "good" : ""}" style="${k > sp.idx ? "opacity:.5" : ""}">${k < sp.idx ? "✓ " : ""}${t.kind === "w" ? "Word ×3" : "Sentence " + k}</span>`).join("");
   if (done) return `<div class="card" style="align-items:center;text-align:center">${buddy("wow", 96)}<h2>Great speaking!</h2><p class="muted">Now write it from memory.</p><button class="big primary" data-act="cover" id="nextBtn">Cover &amp; write</button></div>`;
   const target = tg.kind === "w"
-    ? `<div class="stack" style="align-items:center;text-align:center;gap:8px"><div class="word">${esc(e.w)}</div><div class="dots">${Array.from({ length: tg.need }, (_, k) => `<i class="${k < tg.got ? "on" : ""}"></i>`).join("")}</div><div class="row">${spk(e.id, "w", "Listen", "icon-l")}${spk(e.id, "s", "Slow", "icon-l")}</div></div>`
+    ? `<div class="stack" style="align-items:center;text-align:center;gap:8px"><p class="muted small" style="font-weight:800">Tap the mic once and say it ${tg.need - tg.got > 1 ? (tg.need - tg.got) + " times: " + esc(Array(tg.need - tg.got).fill(e.w).join(", ")) : "once more"}</p><div class="word">${esc(e.w)}</div><div class="dots">${Array.from({ length: tg.need }, (_, k) => `<i class="${k < tg.got ? "on" : ""}"></i>`).join("")}</div><div class="row">${spk(e.id, "w", "Listen", "icon-l")}${spk(e.id, "s", "Slow", "icon-l")}</div></div>`
     : `<div class="ex">${spk(e.id, tg.tag)}<p style="font-size:21px;font-weight:700">${exHtml(tg.text, e.w)}</p></div><p class="muted small">Listen first, then read the whole sentence out loud.</p>`;
   const err = sp.err === "blocked" ? `<div class="notice">The microphone is turned off. On iPhone: <b>Settings → Apps → Safari → Microphone → Allow</b>, and <b>Settings → General → Keyboard → Enable Dictation</b> on. Then tap the button again.</div>`
     : sp.err === "unsupported" ? `<div class="notice">This browser can't listen. Open the app in Safari on your iPhone.</div><button class="big" data-act="cover">Continue to writing</button>` : "";
   return `<div class="card"><div class="row between"><p class="label">Say it out loud</p><div class="chips">${list}</div></div>${target}
     <button class="mic ${sp.listening ? "on" : ""}" id="micBtn" data-act="mic" ${sp.listening ? "disabled" : ""} aria-label="Tap, then speak">${ICON_MIC}</button>
-    <p class="muted" style="text-align:center;font-weight:800">${sp.listening ? "Listening… speak now" : "Tap the mic, then speak"}</p>
+    <p class="muted" style="text-align:center;font-weight:800">${sp.listening ? (tg.kind === "w" ? "Listening… say it, pause, say it again" : "Listening… speak now") : "Tap the mic, then speak"}</p>
     ${sp.heard ? `<div class="fb ${sp.ok ? "good" : "bad"}">${esc(sp.heard)}</div>` : ""}${err}
-    ${sp.fails >= 4 ? `<button class="ghost" data-act="spSkip" style="align-self:center">The app can't hear it right · skip (your teacher will see this)</button>` : ""}</div>`;
+    ${sp.fails >= 3 ? `<button class="ghost" data-act="spSkip" style="align-self:center">The app can't hear it right · skip (your teacher will see this)</button>` : ""}</div>`;
 }
 function listen() {
   const sp = TR.sp; if (!sp || sp.listening) return; const e = BY[TR.queue[0]]; const tg = sp.targets[sp.idx]; if (!tg) return;
   let rec; try { rec = new SR(); } catch (err) { sp.err = "unsupported"; return render(); }
-  rec.lang = "en-US"; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = tg.kind === "s";
+  rec.lang = "en-US"; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = true;
   stopAudio(); sp.listening = true; sp.heard = ""; sp.err = ""; render();
-  let decided = false, lastText = "", timer = null;
+  let decided = false, lastText = "", timer = null, best = 0, quiet = null; const startGot = tg.got;
+  if (tg.kind === "w") {
+    const wordEnd = () => { if (decided) return; decided = true; clearTimeout(timer); clearTimeout(quiet); try { rec.abort(); } catch (x) {} sp.listening = false;
+      if (!lastText) { sp.ok = false; sp.heard = "I didn't hear anything. Tap and speak a little louder."; return render(); }
+      const ok = best > 0; record(e.id, "say", ok, lastText, 0); sp.ok = ok;
+      if (ok) { sp.fails = 0; bumpStat("say", best); award(2 * best, "say"); sp.heard = "✓ I heard: “" + lastText + "”";
+        if (tg.got >= tg.need) { sp.idx++; const nx = sp.targets[sp.idx]; if (nx) setTimeout(() => { if (TR && TR.sp === sp && !sp.listening) speak(e.id, nx.tag); }, 600); }
+        else sp.heard += " Say it " + (tg.need - tg.got) + " more time" + (tg.need - tg.got === 1 ? "" : "s") + "."; }
+      else { sp.fails++; sp.heard = "I heard: “" + lastText + "”. Listen again and try once more."; }
+      if (TR && TR.sp === sp) render(); };
+    rec.onresult = ev => { let joined = ""; for (let i = 0; i < ev.results.length; i++) joined += " " + ev.results[i][0].transcript; joined = joined.trim(); lastText = joined || lastText;
+      const L = ev.results[ev.results.length - 1]; let c = countHeard(joined, tg.text); for (let k = 1; k < L.length; k++) c = Math.max(c, countHeard(L[k].transcript, tg.text));
+      if (c > best) { best = c; tg.got = Math.min(tg.need, startGot + best); const dots = document.querySelectorAll(".dots i"); dots.forEach((d, k) => d.classList.toggle("on", k < tg.got)); }
+      if (tg.got >= tg.need) return wordEnd();
+      clearTimeout(quiet); quiet = setTimeout(wordEnd, 1600); };
+    rec.onerror = ev => { if (/not-allowed|service-not-allowed/.test(ev.error)) { decided = true; clearTimeout(timer); sp.listening = false; sp.err = "blocked"; render(); } };
+    rec.onend = () => wordEnd();
+    timer = setTimeout(wordEnd, 7000);
+    try { rec.start(); } catch (err) { decided = true; sp.listening = false; sp.err = "unsupported"; render(); }
+    return;
+  }
   const check = alts => tg.kind === "w" ? wordHeard(alts, tg.text) : sentHeard(alts, tg.text);
   const finish = (ok, text) => {
     if (decided) return; decided = true; clearTimeout(timer);
@@ -753,7 +785,7 @@ function buildQuiz2() {
 function quizListen() {
   const q = RUN.qs[RUN.i]; const e = BY[q.id]; if (RUN.listening) return;
   let rec; try { rec = new SR(); } catch (err) { RUN.micErr = "unsupported"; return render(); }
-  rec.lang = "en-US"; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = false;
+  rec.lang = "en-US"; rec.interimResults = true; rec.maxAlternatives = 3; rec.continuous = true;
   stopAudio(); RUN.listening = true; RUN.heard = ""; RUN.micErr = ""; render();
   let decided = false, last = "", timer = null;
   const finish = (ok, text) => { if (decided) return; decided = true; clearTimeout(timer); try { rec.abort(); } catch (x) {} RUN.listening = false;
@@ -763,7 +795,7 @@ function quizListen() {
     RUN.heard = (ok ? "✓ I heard: “" : "I heard: “") + text + "”"; RUN.heardOk = ok; render(); };
   rec.onresult = ev => { let j = ""; const alts = []; for (let i = 0; i < ev.results.length; i++) j += " " + ev.results[i][0].transcript; j = j.trim(); last = j || last;
     const L = ev.results[ev.results.length - 1]; for (let k = 0; k < L.length; k++) alts.push(L[k].transcript);
-    if (wordHeard([j].concat(alts), e.w)) return finish(true, j || alts[0]); if (L.isFinal) return finish(false, alts[0]); };
+    if (wordHeard([j].concat(alts), e.w)) return finish(true, j || alts[0]); clearTimeout(RUN._q); RUN._q = setTimeout(() => finish(false, last), 1500); };
   rec.onerror = ev => { if (/not-allowed|service-not-allowed/.test(ev.error)) { decided = true; clearTimeout(timer); RUN.listening = false; RUN.micErr = "blocked"; render(); } };
   rec.onend = () => { if (!decided) finish(false, last); };
   timer = setTimeout(() => { try { rec.stop(); } catch (x) {} setTimeout(() => finish(false, last), 1200); }, 4500);
@@ -1225,7 +1257,7 @@ document.addEventListener("click", async ev => {
   if (a === "skipPlacement" && IS_OWNER) { const qs = buildPlacement(); startAttempt("placement", { n: qs.length, simulated: true }); logDid("placement (sample answers)");
     qs.forEach(q => { const ok = Math.random() < 0.7; ATT.items.push({ id: q.id, t: q.t, ok, ans: ok ? BY[q.id].w : "", ms: 4000 }); });
     RUN = { kind: "placement", qs, right: ATT.items.filter(i => i.ok).length }; return finishRun(); }
-  if (a === "quiz") { if ((ST.lock && ST.lock.on) || (ST.week && !ST.week.introDone)) return; return startRun("quiz"); }
+  if (a === "quiz") { if (!IS_OWNER && ((ST.lock && ST.lock.on) || (ST.week && !ST.week.introDone))) return; return startRun("quiz"); }
   if (a === "train") return startTraining();
   if (a === "trainWeak") { const ids = shuffle(weekIds().filter(id => !isMastered(id))).slice(0, 8); return startTraining(ids.length ? ids : null, "weak"); }
   if (a === "trainOne") return startTraining([b.dataset.id], "free");
@@ -1233,13 +1265,13 @@ document.addEventListener("click", async ev => {
   if (a === "mL" || a === "mR") return matchTap(a === "mL" ? "L" : "R", b.dataset.id);
   if (a === "qmic") return quizListen();
   if (a === "sayGiveUp") { if (!RUN.answered) { RUN.answered = true; RUN.ok = false; record(RUN.qs[RUN.i].id, "say_en", false, "(no mic)", 0); } RUN.fixTries = 3; return render(); }
-  if (a === "coach") { if (ST.week && !ST.week.introDone) return; return startCoach(); }
+  if (a === "coach") { if (!IS_OWNER && ST.week && !ST.week.introDone) return; return startCoach(); }
   if (a === "coachMic") return coachListen();
   if (a === "coachCheck") return coachCheck();
   if (a === "coachRetry") { CO.res = null; CO.text = ""; return render(); }
   if (a === "coachNext") return coachNext();
   if (a === "celOk") return celOk();
-  if (a === "story") { if (ST.week && !ST.week.introDone) return; return openStory(); }
+  if (a === "story") { if (!IS_OWNER && ST.week && !ST.week.introDone) return; return openStory(); }
   if (a === "sword") { const e = BY[b.dataset.id]; speak(e.id, "w"); toast(e.w + " = " + senseList(e).map(s => s.ko).join(" / ")); return; }
   if (a === "readPara") return readPara(+b.dataset.i);
   if (a === "toggleKo") { STORY.showKo[b.dataset.i] = !STORY.showKo[b.dataset.i]; return render(); }
