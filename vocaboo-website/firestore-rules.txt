@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Replace kuaWyJgTBYWBhqbqGsC8svd6vdP2 below with your own User UID (the same one you put in config.js).
+    function isTeacher() { return request.auth != null && request.auth.uid == "kuaWyJgTBYWBhqbqGsC8svd6vdP2"; }
+    function isSelf(uid) { return request.auth != null && request.auth.uid == uid; }
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isTeacher();
+    }
+    match /students/{uid} {
+      allow read, write: if isTeacher() || isSelf(uid);
+      match /{rest=**} {
+        allow read, write: if isTeacher() || isSelf(uid);
+      }
+    }
+  }
+}
