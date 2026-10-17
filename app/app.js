@@ -310,7 +310,10 @@ function setShell(kind) { // kind: tabs | focus | teacher | bare
   tabs.innerHTML = `<div class="tabbar"><nav>${t("today", "Today", I.home)}${t("words", "Words", I.cards)}${t("progress", "Progress", I.chart)}${t("me", "Me", I.me)}</nav></div>`;
 }
 function previewBar() { return IS_OWNER ? `<div class="notice info row between" style="margin-top:12px"><span>Student preview (test data)</span><button class="ghost" data-act="toTeacher">Dashboard</button></div>` : ""; }
-function render() { renderInner(); drawGear(); }
+function render() { renderInner(); drawGear(); fitWords(); }
+function fitWords() { document.querySelectorAll("#app .word").forEach(el => { el.style.whiteSpace = "nowrap"; let fs = parseFloat(getComputedStyle(el).fontSize) || 46; let n = 0;
+  while (el.scrollWidth > el.clientWidth + 1 && fs > 20 && n++ < 30) { fs -= 2; el.style.fontSize = fs + "px"; } }); }
+window.addEventListener("resize", () => { try { fitWords(); } catch (e) {} });
 function renderInner() {
   if (mode === "teacher") { setShell("teacher"); return renderTeacher(); }
   const v = view.name;
@@ -319,6 +322,7 @@ function renderInner() {
   if (v === "error") { setShell("bare"); $app.innerHTML = `<div class="splash"><div class="card" style="text-align:left">${buddy("sad", 80)}<h2>Something went wrong</h2><p>${esc(view.msg)}</p><div class="row"><button class="primary" data-act="reload">Try again</button><button class="ghost" data-act="signout">Sign out</button></div></div></div>`; return; }
   if (v === "placementIntro") { setShell("bare"); return renderPlacementIntro(); }
   if (v === "onboard") { setShell("bare"); return renderOnboard(); }
+  if (v === "pending" || v === "rejected") { setShell("bare"); return renderPending(v === "rejected"); }
   if (v === "levelIntro") { setShell("bare"); return renderLevelIntro(); }
   if (v === "level") { setShell("focus"); return renderLevel(); }
   if (v === "levelResult") { setShell("focus"); return renderLevelResult(); }
@@ -381,6 +385,7 @@ function renderToday() {
     ${dayPct === 100 ? `<div class="notice" style="background:var(--mint-soft);color:var(--mint-ink)">🎉 Everything for today is done. Amazing work!</div>` : ""}
     <div class="path">${trainCard}${quizCard}${coachCard}${storyCard}${bonusCard}</div>`;
   if (!tourAsked && !IS_OWNER && maybeAskPush()) { tourAsked = true; return; }
+  if (ST.tourDone && TI < 0) setTimeout(() => { if (view.name === "tabs" && TAB === "today") maybeSurvey(); }, 700);
   if (!ST.tourDone && TI < 0 && !tourAsked) { tourAsked = true; setTimeout(startTour, 500); }
 }
 function renderPlacementIntro() {
@@ -400,7 +405,7 @@ function renderWords() {
 }
 function wkShort(k) { const a = new Date(k + "T12:00:00"); return (a.getMonth() + 1) + "/" + a.getDate(); }
 function cardBody(e) {
-  return `<div class="row between" style="align-items:flex-start;flex-wrap:wrap;row-gap:8px"><div style="min-width:0"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div><p class="ipa">${esc(e.ipa)}</p></div>
+  return `<div class="row between" style="align-items:flex-start;flex-wrap:wrap;row-gap:8px"><div style="min-width:0"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div><p class="ipa">${esc(e.ipa)}</p>${KO() && e.kr ? `<div style="margin-top:6px">${krBadge(e)}</div>` : ""}</div>
       <div class="row" style="flex-wrap:nowrap">${spk(e.id, "w")}${spk(e.id, "s", "Slow", "icon-l")}</div></div>
     <div class="stack" style="gap:10px">${e.senses.map(x => `<div class="sense"><span class="pos-tag">${esc(x.pos)}</span><div>${KO() ? `<p class="ko">${esc(x.ko)}</p>` : ""}<p class="def" ${KO() ? "" : 'style="font-size:19px;font-weight:700;color:var(--ink)"'}>${esc(x.def)}</p></div></div>`).join("")}</div>
     <div class="stack" style="gap:8px"><p class="label">Syllables${e.syl.includes("·") ? " · tap to hear · dark = strongest" : ""}</p><div class="parts">${sylButtons(e)}</div></div>
@@ -453,6 +458,7 @@ function renderMe() {
   const email = (WW.user() && WW.user().email) || "";
   $app.innerHTML = `${previewBar()}<div class="stack" style="padding-top:18px;align-items:center;text-align:center">${buddy("happy", 96)}<h1>${esc(firstName() || email.split("@")[0] || "Me")}</h1><p class="muted">${esc(email)}${ST.level ? " · " + esc(gradeWord(ST.level.g)) : ""}</p></div>
    <div class="card"><h3>This week's goal</h3>${goalHtml()}</div>
+   ${planCard()}
    <div class="card"><h3>Word meanings</h3><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">English + 한국어</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
    <div class="card"><div class="row between"><h3>Level ${levelInfo().n}</h3><span class="pill sun">${ST.xp || 0} XP</span></div>${levelBar()}<p class="muted small">Earn XP for every right answer, word you learn, sentence and story.</p></div>
    <div class="card"><div class="row between"><h3>Badges</h3><span class="pill">${Object.keys(ST.badges || {}).length}/${BADGES.length}</span></div>${badgeGrid()}</div>
@@ -460,8 +466,10 @@ function renderMe() {
    <button class="big icon-l" data-act="tour">🧭 Show me around the app</button>
    ${voicePicker()}
    <div class="card"><h3>Sounds</h3><p class="muted">Words and sentences play recorded audio. If a word has no recording yet, your phone's voice reads it. Pick that voice above.</p></div>
+   <button class="big icon-l" data-act="feedback">💬 Send feedback</button>
    <button class="big icon-l" data-act="reload">${I.reload} Reload app</button>
-   ${IS_OWNER ? "" : `<button class="big" data-act="signout">Sign out</button>`}`;
+   ${IS_OWNER ? "" : `<button class="big" data-act="signout">Sign out</button>`}
+   ${resetCard()}`;
 }
 
 /* ---------- quiz & placement ---------- */
@@ -892,7 +900,7 @@ async function startCoach() {
   view = { name: "coach" }; render(); maybeTour("coach"); await loadPacksFor(ids);
 }
 function coachPrompt(e, sentence) {
-  return `You are a warm, encouraging English tutor for a ${(ST.profile && ST.profile.age) || 11}-year-old ${KO() ? "Korean " : ""}student learning English (vocabulary about US ${ST.level ? gradeWord(ST.level.g).toLowerCase() : "grade 2-3"} level).
+  return `You are a warm, encouraging English tutor for a ${ageOf(ST) || 11}-year-old ${KO() ? "Korean " : ""}student learning English (vocabulary about US ${ST.level ? gradeWord(ST.level.g).toLowerCase() : "grade 2-3"} level).
 She was asked to say her OWN English sentence using the target word. Her sentence came from speech recognition, so ignore capitalization and missing punctuation, and do not count obvious speech-recognition slips as her mistakes unless they change the meaning.
 
 Target word: "${e.w}"
@@ -1081,7 +1089,7 @@ let STORY = null;
 const storyPath = () => sPath() + "/stories/" + weekKey();
 function storyPrompt(ids) {
   const list = ids.map(id => `${BY[id].w} (${senseList(BY[id]).map(s => KO() ? s.ko : s.def).join(" / ")})`).join("; ");
-  const age = (ST.profile && ST.profile.age) || 11; const lv = ST.level ? Math.max(1, Math.round(ST.level.g)) : 2;
+  const age = ageOf(ST) || 11; const lv = ST.level ? Math.max(1, Math.round(ST.level.g)) : 2;
   return `Write a short, fun story for a ${age}-year-old ${KO() ? "Korean " : ""}student learning English (about US grade ${Math.max(1, lv - 1)}-${lv} reading level), split into 4 parts.
 Use EVERY one of these target words at least once across the story (normal forms like -s, -ed, -ing are fine): ${list}
 Rules: each part is 45-65 words, simple sentences, friendly and kid-appropriate, one clear plot that continues from part to part, a kid main character (can be Korean). No violence or scary content.
@@ -1310,9 +1318,13 @@ const GRADED = BANK.filter(e => typeof e.g === "number");
 const TEST_IDS = (window.__TEST__ || []).filter(id => BY[id] && typeof BY[id].g === "number");
 const KO = () => !(ST && ST.settings && ST.settings.lang === "en");
 const gloss = e => KO() ? e.ko : e.def;
+const KR_TAG = { 1: "초등 필수", 2: "중·고 필수", 3: "고등 선택" };
+const krBadge = e => e && e.kr ? `<span class="pill sun" title="Korean national curriculum word">🇰🇷 ${KR_TAG[e.kr]}</span>` : "";
 const sgloss = s => KO() ? s.ko : s.def;
-function gradeLabel(g) { if (g == null || isNaN(g)) return "–"; if (g < 0.5) return "K"; if (g >= 8.95) return "8+"; return (Math.round(g * 10) / 10).toFixed(1); }
-function gradeWord(g) { const l = gradeLabel(g); return l === "K" ? "Kindergarten" : l === "8+" ? "Grade 8+" : "Grade " + l; }
+function ageOf(st) { const p = st && st.profile; if (!p) return null; if (p.dob) { const d = new Date(p.dob + "T12:00:00"), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; } return p.age != null ? p.age : null; }
+const MAXG = 13; // scale K–12
+function gradeLabel(g) { if (g == null || isNaN(g)) return "–"; if (g < 0.5) return "K"; if (g >= 12.95) return "12+"; return (Math.round(g * 10) / 10).toFixed(1); }
+function gradeWord(g) { const l = gradeLabel(g); return l === "K" ? "Kindergarten" : l === "12+" ? "Grade 12+" : "Grade " + l; }
 function defaultSettings(st) { const legacy = !!(st && st.placement && st.placement.byBook);
   return legacy ? { lang: "ko", textbook: true, tbNew: 12, grNew: 8, review: 10 } : { lang: "ko", textbook: false, tbNew: 12, grNew: 20, review: 10 }; }
 function SET(st) { st = st || ST; return Object.assign(defaultSettings(st), (st && st.settings) || {}); }
@@ -1320,11 +1332,13 @@ function effCfg(st) { const s = SET(st);
   return Object.assign({}, CFG, { textbook: !!s.textbook, tbNew: s.textbook ? s.tbNew : 0, grNew: s.grNew, newPerWeek: (s.textbook ? s.tbNew : 0) + s.grNew, reviewPerWeek: s.review, startUnit: s.startUnit || CFG.startUnit }); }
 function studentHome() {
   if (!ST.profile) return "onboard";
+  if (ST.rejected) return "rejected";
+  if (ST.approved === false) return "pending";
   if (!ST.level || ST.levelRetake) return "levelIntro";
   if (SET().textbook && !ST.placement.done) return "placementIntro";
   return "tabs";
 }
-const readyForWeeks = () => !!(ST && ST.profile && ST.level && (!SET().textbook || ST.placement.done));
+const readyForWeeks = () => !!(ST && ST.profile && ST.approved !== false && !ST.rejected && ST.level && (!SET().textbook || ST.placement.done));
 const firstName = () => (ST && ST.profile && ST.profile.name) || "";
 
 /* new words picked from the graded list, just above her level */
@@ -1334,7 +1348,9 @@ function gradedPick(st, words, used, n) {
   (st.gradedPool || []).forEach(id => { if (out.length < n && ok(id)) out.push(id); });
   st.gradedPool = (st.gradedPool || []).filter(id => !out.includes(id) && !used.has(id) && !words[id]);
   if (out.length < n) {
-    const cand = GRADED.filter(e => e.g >= L - 0.3 && !e.soft && (!s.textbook || e.book === "G") && !known.has(e.id) && ok(e.id)).sort((a, b) => a.g - b.g);
+    const kor = s.kor != null ? s.kor : s.lang !== "en"; const age = ageOf(st) || 11;
+    const bonus = e => !kor || !e.kr ? 0 : e.kr === 1 ? 1.5 : e.kr === 2 ? 1.2 : age >= 14 ? 1.0 : 0.4; // Korean school words come first
+    const cand = GRADED.filter(e => e.g >= L - (kor && e.kr ? 1.5 : 0.3) && !e.soft && (!s.textbook || e.book === "G" || e.book === "H") && !known.has(e.id) && ok(e.id)).sort((a, b) => (a.g - bonus(a)) - (b.g - bonus(b)));
     for (const e of cand) { if (out.length >= n) break; out.push(e.id); }
   }
   return out;
@@ -1342,25 +1358,43 @@ function gradedPick(st, words, used, n) {
 
 /* ---------- onboarding ---------- */
 function renderOnboard() {
-  const p = ST.profile || {}; const lang = (ST.settings && ST.settings.lang) || "ko";
-  const ages = []; for (let a = 6; a <= 16; a++) ages.push(`<option value="${a}" ${(p.age || 11) === a ? "selected" : ""}>${a}</option>`);
+  const p = ST.profile || {}; const lang = ST._lang || (ST.settings && ST.settings.lang) || "ko"; const dob = ST._dob || p.dob || "";
+  const age = dob ? ageOf({ profile: { dob } }) : null; const kid = age != null && age < 14;
   $app.innerHTML = `<section class="hero" style="text-align:center"><div class="stack" style="align-items:center;gap:10px">${buddy("happy", 104)}<h1>Welcome to Vocaboo!</h1><p class="muted">Let's get to know you first</p></div></section>
   <form class="card" data-form="onboard"><h2>About you</h2>
-    <div class="field"><label for="obName">What's your name?</label><input id="obName" type="text" autocomplete="given-name" value="${esc(p.name || "")}" placeholder="Your first name" maxlength="30"></div>
-    <div class="field"><label for="obAge">How old are you?</label><select id="obAge">${ages.join("")}</select></div>
+    <div class="field"><label for="obName">What's your name?</label><input id="obName" type="text" autocomplete="given-name" value="${esc(ST._name != null ? ST._name : p.name || "")}" placeholder="Your first name" maxlength="30"></div>
+    <div class="field"><label for="obDob">Date of birth</label><input id="obDob" type="date" data-change="obDob" value="${esc(dob)}" max="${today()}" min="1930-01-01" style="min-height:52px;font:inherit;font-size:18px;border-radius:16px;border:2px solid var(--line);padding:0 14px;background:#fff">${age != null ? `<span class="muted small">Age ${age}</span>` : ""}</div>
     <div class="field"><label>Word meanings</label><div class="seg" style="width:100%"><button type="button" data-act="obLang" data-v="ko" aria-pressed="${lang !== "en"}" style="flex:1">English + 한국어</button><button type="button" data-act="obLang" data-v="en" aria-pressed="${lang === "en"}" style="flex:1">English only</button></div></div>
+    ${kid ? `<div class="notice info stack" style="gap:8px"><b>For parents · 보호자 동의</b><span class="small">Because the student is under 14, a parent or guardian needs to agree. 만 14세 미만은 보호자 동의가 필요해요.</span>
+      <div class="field"><label for="obParent">Parent or guardian name · 보호자 이름</label><input id="obParent" type="text" value="${esc(ST._parent || "")}" maxlength="40"></div>
+      <label class="row" style="gap:10px;align-items:flex-start;font-weight:700"><input id="obConsent" type="checkbox" ${ST._consent ? "checked" : ""} style="width:22px;height:22px;flex:none;margin-top:2px"><span>I am the parent/guardian and I agree to the <a href="#" data-act="privacy">privacy note</a>. 개인정보 안내에 동의합니다.</span></label></div>` : `<p class="muted small">By continuing you agree to the <a href="#" data-act="privacy">privacy note</a>.</p>`}
     <button class="big primary" type="submit">Next</button></form>`;
 }
+function privacyHtml() { return `<div class="cel" id="privacy"><div class="cel-card" style="text-align:left;max-height:80vh;overflow:auto"><h2>Privacy note · 개인정보 안내</h2>
+  <p class="small"><b>What we keep:</b> name, date of birth, email login, and learning records (answers, quiz scores, study time, sentences written or said in the app, feedback you send).</p>
+  <p class="small"><b>Who sees it:</b> only the student and their Vocaboo teacher. It is never sold or shown to other users.</p>
+  <p class="small"><b>Voice:</b> speaking practice uses your phone's built-in speech recognition. Vocaboo saves only the words it heard, not recordings.</p>
+  <p class="small"><b>AI feedback:</b> sentences and stories are sent to Google's Gemini AI to create feedback.</p>
+  <p class="small"><b>Delete:</b> you can erase everything any time in ⚙️ → My settings → Reset my account, or ask your teacher.</p>
+  <p class="small muted">이름, 생년월일, 이메일, 학습 기록만 저장하며 학생과 담당 선생님만 볼 수 있어요. 문장 피드백을 위해 Google Gemini AI를 사용해요. 설정에서 언제든지 모든 기록을 삭제할 수 있어요.</p>
+  <button class="big primary" data-act="privacyClose">OK</button></div></div>`; }
+function stashOnboard() { const v = id => (document.getElementById(id) || {}).value; if (document.getElementById("obName")) ST._name = v("obName"); const c = document.getElementById("obConsent"); if (c) ST._consent = c.checked; const pa = document.getElementById("obParent"); if (pa) ST._parent = pa.value; }
 function saveOnboard() {
-  const name = (document.getElementById("obName").value || "").trim(); const age = +document.getElementById("obAge").value;
+  stashOnboard(); const name = (ST._name || "").trim(); const dob = (document.getElementById("obDob") || {}).value || ST._dob || "";
   if (!name) { toast("Type your name first"); return; }
-  ST.profile = { name: name.slice(0, 30), age, at: Date.now() }; ST.settings = Object.assign({}, ST.settings || {}, { lang: ST._lang || (ST.settings && ST.settings.lang) || "ko" }); delete ST._lang;
+  if (!dob) { toast("Choose your date of birth"); return; }
+  const age = ageOf({ profile: { dob } }); if (age == null || age < 3 || age > 100) { toast("Check the date of birth"); return; }
+  if (age < 14 && (!ST._consent || !(ST._parent || "").trim())) { toast("A parent needs to type their name and agree"); return; }
+  ST.profile = { name: name.slice(0, 30), dob, at: Date.now() };
+  if (age < 14) ST.consent = { by: ST._parent.trim().slice(0, 40), at: Date.now(), v: 1 }; else ST.consent = { self: true, at: Date.now(), v: 1 };
+  ST.settings = Object.assign({}, ST.settings || {}, { lang: ST._lang || (ST.settings && ST.settings.lang) || "ko" });
+  ["_lang", "_dob", "_name", "_consent", "_parent"].forEach(k => delete ST[k]);
   saveST(); logDid("profile"); view = { name: studentHome() }; render();
 }
 
 /* ---------- adaptive level test ---------- */
 let LT = null;
-const GRID = []; for (let x = -1.5; x <= 10.001; x += 0.1) GRID.push(+x.toFixed(2));
+const GRID = []; for (let x = -1.5; x <= 14.501; x += 0.1) GRID.push(+x.toFixed(2));
 const pKnow = (th, g) => 1 / (1 + Math.exp(-(0.85 * (th - g) + 0.85))); // a word at her level: ~70% known
 const GUESS = 0.6; // chance she guesses (instead of "I don't know") when she doesn't know
 function ltLike(r, th, g) { const P = pKnow(th, g); return r === "ok" ? 0.97 * P + (1 - P) * GUESS * 0.25 : r === "bad" ? 0.03 * P + (1 - P) * GUESS * 0.75 : (1 - P) * (1 - GUESS) + 0.01; }
@@ -1377,17 +1411,23 @@ function renderLevelIntro() {
     ${IS_OWNER ? `<button class="big" data-act="skipLevel">Skip with sample answers (teacher test)</button>` : ""}</div>`;
 }
 async function startLevelTest(sim) {
-  const age = (ST.profile && ST.profile.age) || 11; const mu = Math.max(0, Math.min(8, ST.level ? ST.level.g : age - 7));
+  const age = ageOf(ST) || 11; const mu = Math.max(0, Math.min(10, ST.level ? ST.level.g : age >= 19 ? 10 : age - 7));
   LT = { post: GRID.map(x => Math.exp(-((x - mu) ** 2) / (2 * 2.5 * 2.5))), items: [], used: new Set(), q: null, t0: Date.now(), mu };
   startAttempt("level", { n: 0, retake: !!ST.level }); logDid("level test");
   if (sim) { const truth = mu + (Math.random() * 2 - 1); while (!ltDone()) { ltNext(true); const e = BY[LT.q.id]; const P = pKnow(truth, e.g); const r = Math.random() < P ? "ok" : Math.random() < GUESS ? (Math.random() < 0.25 ? "ok" : "bad") : "idk"; ltRecord(r, r === "ok" ? LT.q.id : r === "bad" ? "x" : null, 3000); } return finishLevelTest(); }
   view = { name: "level" }; ltNext(); render(); await loadPack("TEST"); if (LT && LT.q) speak(LT.q.id, "w");
 }
-function ltDone() { const { sd } = ltEst(); const n = LT.items.length; return n >= 32 || (n >= 24 && sd < 0.5); }
+function ltDone() { const { m, sd } = ltEst(); const n = LT.items.length; const last = LT.items.slice(-8);
+  if (n >= 14 && m >= 12.6 && last.every(i => i.r === "ok")) return true; // knows the hardest words: Grade 12+
+  return n >= 32 || (n >= 24 && sd < 0.5); }
 function ltNext(quiet) {
   const { m } = ltEst(); const n = LT.items.length;
-  const target = n < 3 ? m - 1.4 + n * 0.45 : m - 0.2 + (Math.random() - 0.5) * 0.5;
-  const pool = TEST_IDS.filter(id => !LT.used.has(id)).sort((a, b) => Math.abs(BY[a].g - target) - Math.abs(BY[b].g - target)).slice(0, 5);
+  const target = n < 3 ? m - 1.4 + n * 0.45 : m - 0.2 + (Math.random() - 0.5) * 0.6;
+  const root = w => w.toLowerCase().replace(/[^a-z]/g, "").slice(0, 5);
+  const usedRoots = new Set([...LT.used].map(i => root(BY[i].w)));
+  const free = TEST_IDS.filter(id => !LT.used.has(id) && !usedRoots.has(root(BY[id].w)));
+  let pool = free.filter(id => Math.abs(BY[id].g - target) <= 0.6);
+  if (pool.length < 6) pool = free.slice().sort((a, b) => Math.abs(BY[a].g - target) - Math.abs(BY[b].g - target)).slice(0, 10);
   const id = pool[Math.floor(Math.random() * pool.length)]; LT.used.add(id);
   LT.q = { id, opts: levelOpts(BY[id]) }; LT.t0 = Date.now(); LT.picked = null;
 }
@@ -1426,16 +1466,16 @@ function renderLevel() {
   <p class="muted small" style="text-align:center">There's no score here. It just finds the right words for you.</p>`;
 }
 function finishLevelTest() {
-  const { m, sd } = ltEst(); const g = Math.max(0, Math.min(9, m));
+  const { m, sd } = ltEst(); const g = Math.max(0, Math.min(MAXG, m));
   const known = LT.items.filter(i => i.r === "ok").map(i => i.id); const missed = LT.items.filter(i => i.r !== "ok").map(i => i.id);
   const vocab = Math.round(GRADED.reduce((s, e) => s + pKnow(g, e.g), 0));
   const first = !ST.level; const prev = ST.level;
-  ST.level = { g: +g.toFixed(2), lo: +Math.max(0, g - sd).toFixed(2), hi: +Math.min(9, g + sd).toFixed(2), sd: +sd.toFixed(2), at: Date.now(), n: LT.items.length,
+  ST.level = { g: +g.toFixed(2), lo: +Math.max(0, g - sd).toFixed(2), hi: +Math.min(MAXG, g + sd).toFixed(2), sd: +sd.toFixed(2), at: Date.now(), n: LT.items.length,
     known: [...new Set(((prev && prev.known) || []).concat(known))], vocab, of: GRADED.length, att: ATT.id };
   ST.levelHist = (ST.levelHist || []).concat([{ g: ST.level.g, lo: ST.level.lo, hi: ST.level.hi, at: ST.level.at, vocab }]).slice(-30);
   ST.levelRetake = false;
   ST.gradedPool = [...new Set(missed.filter(id => BY[id].g <= g + 1).sort((a, b) => BY[a].g - BY[b].g).concat(ST.gradedPool || []))].filter(id => !WORDS[id]);
-  if (!ST.goal) { const s = SET(); ST.goal = { g: +Math.min(8.9, g + 1).toFixed(1), by: addDays(today(), 182), from: +g.toFixed(2), auto: true }; void s; }
+  if (!ST.goal && g < 12) { const s = SET(); ST.goal = { g: +Math.min(12.9, g + 1).toFixed(1), by: addDays(today(), 182), from: +g.toFixed(2), auto: true }; void s; }
   ATT.end = Date.now(); ATT.n = LT.items.length; ATT.score = known.length / Math.max(1, LT.items.length); ATT.level = ST.level.g; ATT.sd = ST.level.sd;
   saveAttempt(); bumpStat("levelTests"); award(30, "level check"); logDid("level " + gradeLabel(g));
   if (!ST.week && readyForWeeks()) { buildWeek(ST, WORDS, effCfg(ST), true); loadPacksFor(weekIds()); }
@@ -1444,17 +1484,17 @@ function finishLevelTest() {
 }
 function renderLevelResult() {
   const L = ST.level; const prev = view.prev; const up = prev != null ? L.g - prev : null; const gl = gradeLabel(L.g);
-  const pct = Math.min(100, Math.max(4, L.g / 9 * 100));
-  const scale = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => `<span>${k === 0 ? "K" : k}</span>`).join("");
+  const pct = Math.min(100, Math.max(3, L.g / MAXG * 100));
+  const scale = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(k => `<span>${k === 0 ? "K" : k}</span>`).join("");
   const next = studentHome() === "tabs" ? (ST.week ? "See my words" : "Let's start") : "Next";
   $app.innerHTML = `<div style="height:14px"></div><div class="result-hero">${buddy("wow", 96)}<span class="eyebrow" style="color:rgba(255,255,255,.8)">Your word level</span>
-    <h1 style="font-size:46px;margin:0">${gl === "K" ? "K" : "Grade " + gl}</h1>
-    <p style="opacity:.9">You know words like a typical US ${gl === "K" ? "kindergartner" : "grade " + gl + " student"}.</p>
+    <h1 style="font-size:46px;margin:0">${esc(gradeWord(L.g))}</h1>
+    <p style="opacity:.9">${gl === "12+" ? "You know words like a strong US high-school graduate. Amazing!" : `You know words like a typical US ${gl === "K" ? "kindergartner" : "grade " + gl + " student"}.`}</p>
     ${up != null ? `<span class="pill ${up >= 0 ? "good" : ""}" style="font-size:15px">${up >= 0 ? "▲ up " + up.toFixed(1) : "▼ " + Math.abs(up).toFixed(1)} since last time</span>` : ""}</div>
   <div class="card"><h3>Where you are</h3>
-    <div class="lvscale"><div class="lvtrack"><i class="lvrange" style="left:${L.lo / 9 * 100}%;width:${Math.max(2, (L.hi - L.lo) / 9 * 100)}%"></i><b class="lvdot" style="left:${pct}%"></b>${ST.goal ? `<b class="lvgoal" style="left:${Math.min(100, ST.goal.g / 9 * 100)}%" title="goal">★</b>` : ""}</div><div class="lvlabels">${scale}</div></div>
+    <div class="lvscale"><div class="lvtrack"><i class="lvrange" style="left:${L.lo / MAXG * 100}%;width:${Math.max(2, (L.hi - L.lo) / MAXG * 100)}%"></i><b class="lvdot" style="left:${pct}%"></b>${ST.goal ? `<b class="lvgoal" style="left:${Math.min(100, ST.goal.g / MAXG * 100)}%" title="goal">★</b>` : ""}</div><div class="lvlabels">${scale}</div></div>
     <p class="muted small">Likely range: ${gradeLabel(L.lo)} – ${gradeLabel(L.hi)}${ST.goal ? ` · ★ goal: ${gradeWord(ST.goal.g)}` : ""}</p></div>
-  <div class="tiles"><div class="tile"><b>${L.vocab.toLocaleString()}</b><span>of ${L.of.toLocaleString()} core K–8 words you probably know</span></div><div class="tile"><b>${L.n}</b><span>words checked</span></div></div>
+  <div class="tiles"><div class="tile"><b>${L.vocab.toLocaleString()}</b><span>of ${L.of.toLocaleString()} core K–12 words you probably know</span></div><div class="tile"><b>${L.n}</b><span>words checked</span></div></div>
   <div class="card"><h3>Your weekly goal</h3>${goalHtml()}</div>
   <button class="big primary" data-act="levelDone">${next}</button>`;
 }
@@ -1495,7 +1535,9 @@ function openMenu() {
   el.innerHTML = `<div class="menu-sheet" role="dialog" aria-label="Menu"><div class="row between"><div class="stack" style="gap:0"><b>${esc(firstName() || em.split("@")[0] || "Menu")}</b><span class="muted small">${esc(em)}</span></div><button class="x" data-act="menuClose" aria-label="Close">${I.x}</button></div>
     ${home ? `<button class="menu-item" data-act="menuHome">🏠 ${inRun ? "Stop and go home" : "Home"}</button><button class="menu-item" data-act="menuMe">⚙️ My settings</button>` : ""}
     ${ST && !IS_OWNER && !pushOn() && WW.pushPermission() !== "unsupported" ? `<button class="menu-item" data-act="menuPush">🔔 Turn on reminders</button>` : ""}
+    ${ST && ["pending", "rejected"].indexOf(studentHome()) < 0 && ST.profile ? `<button class="menu-item" data-act="feedback">💬 Send feedback</button>` : ""}
     <button class="menu-item" data-act="reload">🔄 Reload app</button>
+    ${IS_OWNER ? `<button class="menu-item" data-act="menuSurvey">⭐ Preview parent survey</button>` : ""}
     ${IS_OWNER ? `<button class="menu-item" data-act="toTeacher">📊 Teacher dashboard</button>` : `<button class="menu-item danger" data-act="menuSignout">↩️ Sign out</button>`}</div>`;
   document.body.appendChild(el);
   el.addEventListener("click", ev => { if (ev.target === el) closeMenu(); });
@@ -1515,12 +1557,133 @@ function maybeAskPush() {
   document.body.appendChild(el); return true;
 }
 function closePushAsk() { const el = document.getElementById("pushAsk"); if (el) el.remove(); PUSHASK = false; if (ST && !ST.tourDone && TI < 0) setTimeout(startTour, 300); }
+
+/* ---------- waiting for approval ---------- */
+function renderPending(rejected) {
+  const em = (WW.user() && WW.user().email) || "";
+  $app.innerHTML = `<section class="hero" style="text-align:center"><div class="stack" style="align-items:center;gap:10px">${buddy(rejected ? "sad" : "happy", 104)}<h1>${rejected ? "Account not approved" : ST.waitlist ? "You're on the list!" : "Almost there!"}</h1><p class="muted">${esc(em)}</p></div></section>
+  <div class="card">${!rejected && ST.waitlist ? `<h3>Sorry, all free beta spots are filled! 🙏</h3><p>Good news: you're on the <b>official launch list</b>. We'll let you know as soon as Vocaboo opens for more students.</p><p class="muted small">무료 베타 자리가 모두 찼어요. 정식 출시 명단에 등록되었으니 오픈하면 바로 알려 드릴게요!</p><button class="big primary" data-act="checkApproved">Check again</button>` : rejected ? `<p>Your teacher didn't approve this account. If you think this is a mistake, please contact your teacher.</p>` : `<h3>Waiting for your teacher</h3><p>Thanks, ${esc(firstName())}! Your teacher needs to approve your account before you can start. This is usually quick.</p><p class="muted small">선생님이 계정을 승인하면 바로 시작할 수 있어요.</p><button class="big primary" data-act="checkApproved">Check again</button>`}
+  <button class="big" data-act="signout">Sign out</button></div>`;
+}
+async function checkApproved() { const d = await db.doc(sPath()).get(); if (d.exists) { const x = d.data(); ST.approved = x.approved; ST.rejected = x.rejected; }
+  if (ST.approved === false && !ST.rejected) { toast("Not approved yet. Try again a little later"); return render(); }
+  return loadStudent(false); }
+
+/* ---------- reset my account ---------- */
+function resetCard() { return `<div class="card"><h3>Reset my account</h3><p class="muted small">Start over from the beginning. This permanently deletes all your progress.</p><button class="big" data-act="resetMe" style="color:#B3261E">Reset my account…</button></div>`; }
+function resetAsk(step) {
+  const old = document.getElementById("resetAsk"); if (old) old.remove();
+  const el = document.createElement("div"); el.className = "cel"; el.id = "resetAsk";
+  el.innerHTML = step === 1 ? `<div class="cel-card" style="text-align:left"><div class="cel-icon" style="text-align:center">⚠️</div><h2>Are you sure?</h2>
+    <p>Resetting <b>permanently deletes</b>:</p><ul class="small" style="margin:0;padding-left:20px;line-height:1.7"><li>all your learned words and review history</li><li>your streak, XP, level and badges</li><li>quiz scores, stories, sentences and study time</li><li>your word level test results</li></ul>
+    <p class="small"><b>This cannot be undone.</b> Your login (email and password) stays the same.</p><p class="small muted">모든 학습 기록이 영구적으로 삭제되며 되돌릴 수 없어요.</p>
+    <button class="big" data-act="resetStep2" style="color:#B3261E">Yes, continue</button><button class="big primary" data-act="resetCancel">Cancel</button></div>`
+  : `<div class="cel-card" style="text-align:left"><h2>Last step</h2><p>Type <b>RESET</b> to permanently delete everything and start over.</p>
+    <input id="resetTxt" type="text" autocomplete="off" autocapitalize="characters" style="min-height:52px;font:inherit;font-size:20px;border-radius:16px;border:2px solid var(--line);padding:0 14px;width:100%;text-transform:uppercase">
+    <button class="big" data-act="resetGo" style="background:#B3261E;color:#fff">Delete everything</button><button class="big primary" data-act="resetCancel">Cancel</button></div>`;
+  document.body.appendChild(el); const i = document.getElementById("resetTxt"); if (i) i.focus();
+}
+async function wipeStudent(sid, keep) {
+  const base = "students/" + sid;
+  for (const c of ["words", "attempts", "sessions", "stories", "feedback"]) { const s = await db.collection(base + "/" + c).get(); for (const d of s.docs) await db.doc(base + "/" + c + "/" + d.id).delete(); }
+  const fresh = Object.assign(newStudent(!!keep.test), { email: keep.email || "", resetAt: Date.now(), resets: (keep.resets || 0) + 1 });
+  if (keep.approved != null) fresh.approved = keep.approved; if (keep.rejected) fresh.rejected = keep.rejected; if (keep.settings && keep.settings.lang) fresh.settings = { lang: keep.settings.lang };
+  await db.doc(base).set(fresh); return fresh;
+}
+async function resetGo() {
+  const v = ((document.getElementById("resetTxt") || {}).value || "").trim().toUpperCase(); if (v !== "RESET") { toast("Type RESET to confirm"); return; }
+  const el = document.getElementById("resetAsk"); if (el) el.innerHTML = `<div class="cel-card"><h2>Deleting…</h2><p class="muted">Please wait.</p></div>`;
+  try { clearInterval(hbTimer); SESSION = null; leaveActivity(); await wipeStudent(SID, ST); if (el) el.remove(); toast("Your account was reset"); WORDS = {}; return loadStudent(!!ST.test); }
+  catch (e) { console.error(e); if (el) el.remove(); toast("Couldn't reset: " + (e.code || e.message)); }
+}
+
+/* ---------- feedback ---------- */
+function feedbackAsk() {
+  const el = document.createElement("div"); el.className = "cel"; el.id = "fbAsk";
+  el.innerHTML = `<div class="cel-card" style="text-align:left"><h2>Send feedback 💬</h2><p class="muted small">What do you like? What's hard or broken? Ideas? Your teacher reads every message.</p>
+    <div class="row" style="justify-content:space-between">${["😍", "🙂", "😐", "🙁"].map((f, k) => `<button class="opt rate" data-act="fbRate" data-r="${k}" style="flex:1;text-align:center;font-size:30px;min-height:58px">${f}</button>`).join("")}</div>
+    <textarea id="fbTxt" rows="4" maxlength="1500" placeholder="Type here… (한국어도 괜찮아요)" style="font:inherit;font-size:17px;padding:12px 14px;border-radius:18px;border:2px solid var(--line);width:100%;resize:vertical"></textarea>
+    <button class="big primary" data-act="fbSend">Send</button><button class="big" data-act="fbClose">Cancel</button></div>`;
+  document.body.appendChild(el);
+}
+async function feedbackSend() {
+  const t = ((document.getElementById("fbTxt") || {}).value || "").trim(); const r = document.querySelector('[data-act="fbRate"].sel'); if (!t && !r) { toast("Pick a face or type a message"); return; }
+  const id = "f" + Date.now().toString(36);
+  await setDoc(sPath() + "/feedback/" + id, { at: Date.now(), text: t.slice(0, 1500), rate: r ? +r.dataset.r : null, screen: view.name, tab: TAB, name: firstName(), email: (WW.user() && WW.user().email) || "" });
+  const el = document.getElementById("fbAsk"); if (el) el.remove(); toast("Thank you! Your teacher will read it 💜");
+}
+
+/* ---------- my study plan (student / parent can change) ---------- */
+function planCard() { const s = SET(); const c = effCfg(ST);
+  if (s.textbook) return `<div class="card"><h3>My study plan</h3><p class="muted small">Your teacher sets your plan: ${c.newPerWeek} new words and ${c.reviewPerWeek} review words a week.</p></div>`;
+  const sel = (id, vals, cur, unit) => `<select id="${id}" data-change="myPlan" style="min-height:48px;border-radius:14px;border:2px solid var(--line);padding:0 12px;font:inherit;font-size:17px;background:#fff">${vals.map(v => `<option value="${v}" ${+cur === v ? "selected" : ""}>${v} ${unit}</option>`).join("")}</select>`;
+  const kor = s.kor != null ? s.kor : s.lang !== "en";
+  return `<div class="card"><h3>My study plan</h3><p class="muted small">Choose what fits your week. Changes start with next week's words. 매주 학습량을 직접 정할 수 있어요.</p>
+    <div class="grid2"><div class="field"><label for="myNew">New words per week</label>${sel("myNew", [5, 10, 15, 20, 25, 30, 40], s.grNew, "words")}</div>
+    <div class="field"><label for="myRev">Review words per week</label>${sel("myRev", [0, 5, 10, 15, 20], s.review, "words")}</div>
+    <div class="field"><label for="myQuiz">Daily quiz length</label>${sel("myQuiz", [10, 15, 20, 25, 30], ST.quizSize || 15, "questions")}</div>
+    ${KO() ? `<div class="field"><label for="myKor">Korean school words first</label><select id="myKor" data-change="myPlan" style="min-height:48px;border-radius:14px;border:2px solid var(--line);padding:0 12px;font:inherit;font-size:17px;background:#fff"><option value="1" ${kor ? "selected" : ""}>On (교과서 필수 단어 먼저)</option><option value="0" ${kor ? "" : "selected"}>Off</option></select></div>` : ""}</div>
+    <p class="muted small">About ${Math.round((s.grNew * 1.5 + (ST.quizSize || 15) * 0.6) / 7 + 5)} minutes a day.</p></div>`; }
+function savePlan() { const v = id => document.getElementById(id); const s = Object.assign({}, ST.settings || {});
+  if (v("myNew")) s.grNew = +v("myNew").value; if (v("myRev")) s.review = +v("myRev").value; if (v("myKor")) s.kor = v("myKor").value === "1";
+  ST.settings = s; if (v("myQuiz")) ST.quizSize = +v("myQuiz").value; ST.planBy = { at: Date.now(), who: "student" }; saveST(); toast("Saved. Starts with next week's words"); render(); }
+
+/* ---------- parent survey (day 7 and day 30) ---------- */
+const SURVEY = [
+  { k: "often", q: "How often does your child use Vocaboo?", ko: "아이가 얼마나 자주 사용하나요?", type: "one", opts: [["daily", "Every day · 매일"], ["weekly", "A few times a week · 주 몇 회"], ["rarely", "Rarely · 거의 안 해요"]] },
+  { k: "learning", q: "Is your child learning new words?", ko: "새 단어를 배우고 있나요?", type: "scale" },
+  { k: "enjoy", q: "Does your child enjoy using it?", ko: "아이가 즐겁게 사용하나요?", type: "scale" },
+  { k: "amount", q: "Is the daily amount right?", ko: "하루 학습량은 어떤가요?", type: "one", opts: [["little", "Too little · 적어요"], ["right", "Just right · 적당해요"], ["much", "Too much · 많아요"]] },
+  { k: "helps", q: "Which parts help most? (choose any)", ko: "가장 도움이 되는 부분은? (여러 개 선택)", type: "multi", opts: [["train", "Training · 단어 학습"], ["quiz", "Daily quiz · 퀴즈"], ["speak", "Speaking · 말하기"], ["coach", "Sentence coach · 문장 코치"], ["story", "Stories · 이야기"]] },
+  { k: "pay", q: "After the free beta, would you consider paying for Vocaboo?", ko: "무료 베타 후 유료로 이용할 생각이 있나요?", type: "one", opts: [["yes", "Yes · 네"], ["maybe", "Maybe · 아마도"], ["no", "No · 아니요"]] },
+  { k: "recommend", q: "Would you recommend Vocaboo to another parent?", ko: "다른 부모님께 추천하시겠어요?", type: "one", opts: [["yes", "Yes · 네"], ["maybe", "Maybe · 아마도"], ["no", "No · 아니요"]] }
+];
+let SV = null;
+function surveyDue() {
+  if (!ST || !ST.profile || ST.approved === false || ST.rejected) return null;
+  if (ST.surveyNow) return "now";
+  const S = ST.survey || {}; if (S.snooze && S.snooze > Date.now()) return null;
+  const start = (ST.profile && ST.profile.at) || ST.created || Date.now(); const days = (Date.now() - start) / 864e5;
+  if (days >= 30 && !S.d30) return "d30"; if (days >= 7 && !S.d7 && !S.d30) return "d7"; return null;
+}
+function maybeSurvey() { if (SV || PUSHASK || document.querySelector(".cel,.tour")) return false; const due = surveyDue(); if (!due) return false; openSurvey(due); return true; }
+function openSurvey(due) { SV = { due, a: {}, stars: 0 }; drawSurvey(); }
+function drawSurvey() {
+  const old = document.getElementById("survey");
+  const el = document.createElement("div"); el.className = "cel"; el.id = "survey";
+  const opt = (q, v, label) => { const on = q.type === "multi" ? (SV.a[q.k] || []).includes(v) : SV.a[q.k] === v;
+    return `<button class="opt ${on ? "sel" : ""}" data-act="svPick" data-k="${q.k}" data-v="${v}" style="min-height:44px;font-size:15px;padding:8px 12px">${esc(label)}</button>`; };
+  const body = SURVEY.map((q, i) => `<div class="stack" style="gap:6px;align-self:stretch"><b>${i + 1}. ${esc(q.q)}</b><span class="muted small">${esc(q.ko)}</span>
+    ${q.type === "scale" ? `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${[1, 2, 3, 4, 5].map(n => opt(q, n, String(n))).join("")}</div><div class="row between muted small"><span>Not at all · 전혀</span><span>A lot · 많이</span></div>`
+      : `<div class="opts" style="gap:6px">${q.opts.map(([v, l]) => opt(q, v, l)).join("")}</div>`}</div>`).join("");
+  el.innerHTML = `<div class="cel-card" style="text-align:left;max-height:86vh;overflow:auto;gap:14px"><span class="eyebrow">For parents · 부모님께</span><h2 style="margin:0">How is Vocaboo going?</h2>
+    <p class="muted small" style="margin:0">2 minutes. Your answers help us make Vocaboo better during the free beta. 2분이면 끝나요. 베타 기간 동안 앱을 개선하는 데 큰 도움이 돼요!</p>
+    <div class="stack" style="gap:6px;align-self:stretch"><b>Overall, how would you rate Vocaboo?</b><span class="muted small">전체적으로 몇 점을 주시겠어요?</span>
+      <div class="row" style="gap:4px;justify-content:center">${[1, 2, 3, 4, 5].map(n => `<button data-act="svStar" data-n="${n}" aria-label="${n} stars" style="background:none;box-shadow:none;min-height:52px;padding:0 4px;font-size:40px;color:${n <= SV.stars ? "#FFC93C" : "#D9D4EA"}">★</button>`).join("")}</div></div>
+    ${body}
+    <div class="stack" style="gap:6px;align-self:stretch"><b>${SURVEY.length + 1}. Anything you'd like to tell us?</b><span class="muted small">자유롭게 의견을 남겨 주세요 (선택)</span>
+      <textarea id="svTxt" rows="4" maxlength="2000" style="font:inherit;font-size:16px;padding:12px 14px;border-radius:18px;border:2px solid var(--line);width:100%;resize:vertical">${esc(SV.txt || "")}</textarea></div>
+    <button class="big primary" data-act="svSend">Send · 보내기</button><button class="ghost" data-act="svLater" style="align-self:center">Later · 나중에</button></div>`;
+  if (old) { const oc = old.querySelector(".cel-card"), sc = oc.scrollTop; oc.innerHTML = el.querySelector(".cel-card").innerHTML; oc.scrollTop = sc; return; }
+  document.body.appendChild(el);
+}
+function svKeepText() { const t = document.getElementById("svTxt"); if (t && SV) SV.txt = t.value; }
+async function surveySend() {
+  svKeepText(); if (!SV.stars) { toast("Tap the stars first · 별점을 눌러 주세요"); document.querySelector("#survey .cel-card").scrollTop = 0; return; }
+  const id = "s" + Date.now().toString(36);
+  await setDoc(sPath() + "/feedback/" + id, { kind: "survey", at: Date.now(), due: SV.due, stars: SV.stars, answers: SV.a, text: String(SV.txt || "").slice(0, 2000), name: firstName(), email: (WW.user() && WW.user().email) || "" });
+  const S = Object.assign({}, ST.survey || {}); if (SV.due === "d30") S.d30 = Date.now(); else S.d7 = Date.now(); delete S.snooze; ST.survey = S; ST.surveyNow = false; saveST();
+  const el = document.getElementById("survey"); if (el) el.remove(); SV = null; toast("Thank you so much! 감사합니다 💜"); render();
+}
+function surveyLater() { const S = Object.assign({}, ST.survey || {}); if (S.snoozed) { if (SV.due === "d30") S.d30 = "skipped"; else S.d7 = "skipped"; } else { S.snooze = Date.now() + 2 * 864e5; S.snoozed = true; }
+  ST.survey = S; ST.surveyNow = false; saveST(); const el = document.getElementById("survey"); if (el) el.remove(); SV = null; }
 let T = { students: [], sel: null, data: null, tab: "week", week: null, names: {}, view: "list", q: "", sort: "name" };
 async function loadTeacher() {
   const list = await getAll("students");
   T.students = list.sort((a, b) => (a.test ? 1 : 0) - (b.test ? 1 : 0) || a.created - b.created);
   if (user) { try { const ids = T.students.map(s => s._id); if (ids.length) T.names = await user.profiles(ids); } catch (e) {} }
   if (T.sel && !T.students.find(s => s._id === T.sel)) { T.sel = null; T.view = "list"; }
+  try { const bd = await db.doc("config/beta").get(); T.beta = bd.exists ? bd.data() : { on: false, cap: 50, count: 0 }; } catch (e) { T.beta = { on: false, cap: 50, count: 0 }; }
   if (T.view === "student" && T.sel) await loadStudentData(T.sel); else T.data = null;
   render();
 }
@@ -1561,7 +1724,7 @@ function reportText() {
   const wk = T.week; const S = weekStats(wk); const st = T.data.st; const name = studentLabel(T.students.find(s => s._id === T.sel));
   const L = [];
   L.push(`VOCABOO WEEKLY REPORT — ${name} — ${wkLabel(wk)}`);
-  if (st.profile) L.push(`Age ${st.profile.age}. Meanings shown: ${SET(st).lang === "en" ? "English only" : "English + Korean"}.`);
+  if (st.profile) L.push(`Age ${ageOf(st)}. Meanings shown: ${SET(st).lang === "en" ? "English only" : "English + Korean"}.`);
   if (st.level) L.push(`Word level: ${gradeWord(st.level.g)} (range ${gradeLabel(st.level.lo)}–${gradeLabel(st.level.hi)}), checked ${new Date(st.level.at).toLocaleDateString()}, about ${st.level.vocab}/${st.level.of} core words known.${st.goal ? " Goal: " + gradeWord(st.goal.g) + " by " + st.goal.by + "." : ""}`);
   L.push(`Time: ${fmtMin(S.totalSec)} min over ${S.activeDays}/7 days, ${S.sess.length} sessions`);
   Object.entries(S.days).forEach(([d, x]) => L.push(`  ${d} ${DOW[new Date(d + "T12:00:00").getDay()]}: ${fmtMin(x.sec)} min, quiz ${x.quiz.length ? x.quiz.join("/") + "%" : "none"}${x.train ? ", training x" + x.train : ""}`));
@@ -1596,11 +1759,30 @@ async function resetTest() {
 }
 async function saveStu() {
   const st = T.data.st; const v = id => document.getElementById(id).value; const n = (id, lo, hi) => Math.min(hi, Math.max(lo, +v(id) || 0));
-  st.settings = Object.assign({}, st.settings || {}, { lang: v("sLang"), textbook: v("sTb") === "1", tbNew: n("sTbNew", 0, 40), startUnit: n("sStart", 1, 30), grNew: n("sGrNew", 0, 40), review: n("sRev", 0, 30) });
-  if (v("sGoal") !== "") st.goal = Object.assign({}, st.goal || { from: st.level ? st.level.g : 0 }, { g: n("sGoal", 0, 9), by: v("sGoalBy") || addDays(today(), 182), auto: false });
-  if (v("sLevel") !== "" && st.level && Math.abs(+v("sLevel") - st.level.g) > 0.04) { const g = n("sLevel", 0, 9); st.level = Object.assign({}, st.level, { g, lo: Math.max(0, g - 0.3), hi: Math.min(9, g + 0.3), set: "teacher" }); }
+  st.settings = Object.assign({}, st.settings || {}, { lang: v("sLang"), textbook: v("sTb") === "1", tbNew: n("sTbNew", 0, 40), startUnit: n("sStart", 1, 30), grNew: n("sGrNew", 0, 40), review: n("sRev", 0, 30), kor: v("sKor") === "1" });
+  if (v("sGoal") !== "") st.goal = Object.assign({}, st.goal || { from: st.level ? st.level.g : 0 }, { g: n("sGoal", 0, 13), by: v("sGoalBy") || addDays(today(), 182), auto: false });
+  if (v("sLevel") !== "" && st.level && Math.abs(+v("sLevel") - st.level.g) > 0.04) { const g = n("sLevel", 0, 13); st.level = Object.assign({}, st.level, { g, lo: Math.max(0, g - 0.3), hi: Math.min(13, g + 0.3), set: "teacher" }); }
   st.quizSize = n("cfgSize", 5, 30);
   await setDoc("students/" + T.sel, st); toast("Plan saved"); render();
+}
+
+async function loadFeedback() { const out = [];
+  for (const s of T.students) { try { (await getAll("students/" + s._id + "/feedback")).forEach(f => out.push(Object.assign({ sid: s._id, who: studentLabel(s) }, f))); } catch (e) {} }
+  T.fb = out.sort((a, b) => b.at - a.at); if (T.tab === "feedback") render(); }
+function feedbackHtml() {
+  if (!T.fb) return `<div class="card"><p class="muted">Loading feedback…</p></div>`;
+  const faces = ["😍", "🙂", "😐", "🙁"]; const sv = T.fb.filter(f => f.kind === "survey"), kids = T.fb.filter(f => f.kind !== "survey");
+  const L = k => { const q = SURVEY.find(x => x.k === k); return v => q && q.opts ? ((q.opts.find(o => o[0] === v) || [, v])[1].split(" · ")[0]) : v; };
+  const tally = k => { const c = {}; sv.forEach(f => { const v = f.answers && f.answers[k]; (Array.isArray(v) ? v : v != null ? [v] : []).forEach(x => c[x] = (c[x] || 0) + 1); }); return c; };
+  const bar = (label, n, tot, col) => `<div class="stack" style="gap:3px"><div class="row between small"><span>${esc(label)}</span><b>${n}</b></div><div class="hbar"><i style="width:${tot ? Math.round(n / tot * 100) : 0}%;background:${col || "#7B61FF"}"></i></div></div>`;
+  const avg = (k) => { const v = sv.map(f => f.answers && f.answers[k]).filter(x => typeof x === "number"); return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : "–"; };
+  const stars = sv.length ? (sv.reduce((a, f) => a + (f.stars || 0), 0) / sv.length) : 0;
+  const block = (k, title) => { const c = tally(k); const tot = Object.values(c).reduce((a, b) => a + b, 0); const q = SURVEY.find(x => x.k === k);
+    return `<div class="card"><h3>${esc(title)}</h3>${q.opts.map(([v]) => bar(L(k)(v), c[v] || 0, k === "helps" ? sv.length : tot, v === "yes" || v === "right" || v === "daily" ? "#1FA98F" : v === "no" || v === "rarely" ? "#FF6B5B" : "#7B61FF")).join("")}</div>`; };
+  const summary = sv.length ? `<div class="kpis"><div class="tile"><b>${stars.toFixed(1)} ★</b><span>average rating · ${sv.length} parent${sv.length === 1 ? "" : "s"}</span></div><div class="tile"><b>${avg("learning")}/5</b><span>learning new words</span></div><div class="tile"><b>${avg("enjoy")}/5</b><span>enjoys it</span></div></div>
+    <div class="grid">${block("pay", "Would consider paying")}${block("recommend", "Would recommend")}${block("often", "How often")}${block("amount", "Daily amount")}${block("helps", "Helps most")}</div>
+    <div class="card"><h3>Parent comments</h3>${sv.filter(f => f.text).map(f => `<div class="stack" style="gap:2px;border-top:1px solid var(--line);padding-top:8px"><div class="row between"><b>${"★".repeat(f.stars || 0)} ${esc(f.who)}</b><span class="muted small">${new Date(f.at).toLocaleDateString()}</span></div><p style="white-space:pre-wrap;margin:0">${esc(f.text)}</p></div>`).join("") || `<p class="muted">No comments yet.</p>`}</div>` : `<div class="card"><p class="muted">No parent surveys yet. They pop up after 7 and 30 days, or send one from a student's Study plan tab.</p></div>`;
+  return `<h2>⭐ Parent surveys</h2>${summary}<h2>💬 Student feedback (${kids.length})</h2>${kids.length ? kids.map(f => `<div class="card" style="gap:6px"><div class="row between"><b>${f.rate != null ? faces[f.rate] + " " : ""}${esc(f.who)}</b><span class="muted small">${new Date(f.at).toLocaleString()}</span></div>${f.text ? `<p style="white-space:pre-wrap;margin:0">${esc(f.text)}</p>` : ""}<span class="muted small">${esc(f.email || "")} · sent from ${esc(f.screen === "tabs" ? f.tab : f.screen)}</span></div>`).join("") : `<div class="card"><p class="muted">No feedback yet. Students and parents can send it from ⚙️ → Send feedback.</p></div>`}`;
 }
 
 /* ---------- teacher views ---------- */
@@ -1615,7 +1797,8 @@ function stuStatus(s) { const la = lastActive(s);
   if (la.days >= 3) return { cls: "bad", txt: "Inactive " + la.days + " days" };
   return { cls: "sun", txt: "Quiz not done yet" }; }
 function renderTeacherList() {
-  const real = T.students.filter(s => !s.test), test = T.students.filter(s => s.test);
+  const all = T.students.filter(s => !s.test), test = T.students.filter(s => s.test);
+  const pending = all.filter(s => s.approved === false && !s.rejected), rejected = all.filter(s => s.rejected), real = all.filter(s => s.approved !== false && !s.rejected);
   const q = norm(T.q || "");
   let list = real.filter(s => !q || norm(studentLabel(s) + " " + (s.email || "")).includes(q));
   const key = { name: s => norm(studentLabel(s)), level: s => -(s.level ? s.level.g : -1), active: s => lastActive(s).days, streak: s => -((s.streak && s.streak.last >= addDays(today(), -1)) ? s.streak.count : 0) }[T.sort] || (s => 0);
@@ -1626,18 +1809,21 @@ function renderTeacherList() {
       <span class="folder-tab"></span>
       <span class="folder-top"><span class="avatar">${esc((nm[0] || "?").toUpperCase())}</span><span class="stack" style="gap:0;min-width:0;text-align:left"><b class="folder-name">${esc(nm)}</b><span class="muted small ellipsis">${esc(s.email || "")}</span></span></span>
       <span class="row" style="gap:6px"><span class="pill ${st.cls}">${esc(st.txt)}</span>${s.settings && s.settings.lang === "en" ? `<span class="pill">EN only</span>` : ""}</span>
-      <span class="folder-stats"><span><b>${s.level ? esc(gradeLabel(s.level.g)) : "–"}</b><i>level</i></span><span><b>${streak}🔥</b><i>streak</i></span><span><b>${s.profile ? s.profile.age : "–"}</b><i>age</i></span><span><b>${s.push && s.push.tokens && s.push.tokens.length ? "🔔" : "🔕"}</b><i>reminders</i></span></span>
+      <span class="folder-stats"><span><b>${s.level ? esc(gradeLabel(s.level.g)) : "–"}</b><i>level</i></span><span><b>${streak}🔥</b><i>streak</i></span><span><b>${ageOf(s) != null ? ageOf(s) : "–"}</b><i>age</i></span><span><b>${s.push && s.push.tokens && s.push.tokens.length ? "🔔" : "🔕"}</b><i>reminders</i></span></span>
       <span class="muted small" style="text-align:left">Last active ${esc(la.txt)}</span></button>`; };
   $app.innerHTML = `<header class="t-head"><div class="row between"><div class="stack" style="gap:2px"><span class="eyebrow" style="color:rgba(255,255,255,.75)">Teacher dashboard</span><h1>Vocaboo</h1></div>
-    <div class="row"><button data-act="refresh">Refresh</button><button data-act="preview">Try as student</button><button data-act="tGlobal">Settings for everyone</button><button data-act="signout">Sign out</button></div></div>
-    <div class="row"><span class="streak-chip">📁 ${real.length} student${real.length === 1 ? "" : "s"}</span><span class="streak-chip">✅ ${doneToday} quiz done today</span>${needHelp ? `<span class="streak-chip" style="background:#FF6B5B">⚠️ ${needHelp} need attention</span>` : ""}</div></header>
-  ${T.tab === "global" ? `<div class="row"><button class="ghost" data-act="tBackList">${I.back.replace("<svg", '<svg width="18" height="18"')} All students</button></div>` + settingsHtml(true) : `
+    <div class="row"><button data-act="refresh">Refresh</button><button data-act="preview">Try as student</button><button data-act="tFeedback">💬 Feedback</button><button data-act="tGlobal">Settings for everyone</button><button data-act="signout">Sign out</button></div></div>
+    <div class="row"><span class="streak-chip">📁 ${real.length} student${real.length === 1 ? "" : "s"}</span><span class="streak-chip">✅ ${doneToday} quiz done today</span>${needHelp ? `<span class="streak-chip" style="background:#FF6B5B">⚠️ ${needHelp} need attention</span>` : ""}${pending.length ? `<span class="streak-chip" style="background:#FFC93C;color:#5A3D00">⏳ ${pending.length} waiting for approval</span>` : ""}</div></header>
+  ${T.tab === "global" ? `<div class="row"><button class="ghost" data-act="tBackList">${I.back.replace("<svg", '<svg width="18" height="18"')} All students</button></div>` + settingsHtml(true) : T.tab === "feedback" ? `<div class="row"><button class="ghost" data-act="tBackList">${I.back.replace("<svg", '<svg width="18" height="18"')} All students</button></div>` + feedbackHtml() : `
+  ${pending.length ? `<div class="card" style="border:2px solid #FFC93C"><div class="row between"><h2 style="margin:0">⏳ Waiting for approval (${pending.length})</h2>${pending.length > 1 ? `<button class="primary" data-act="approveAll">Approve all</button>` : ""}</div>
+    <div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Age</th><th>Parent consent</th><th>Signed up</th><th></th></tr></thead><tbody>${pending.map(s => `<tr><td><b>${esc((s.profile && s.profile.name) || "(no name yet)")}</b>${s.waitlist ? ` <span class="pill sun">launch list</span>` : ""}</td><td>${esc(s.email || "")}</td><td>${ageOf(s) != null ? ageOf(s) : "–"}</td><td class="small">${s.consent ? (s.consent.by ? "✓ " + esc(s.consent.by) : "✓ (14+)") : "–"}</td><td class="small">${s.created ? new Date(s.created).toLocaleDateString() : ""}</td><td><div class="row" style="flex-wrap:nowrap"><button class="primary" data-act="approve" data-id="${s._id}">Approve</button><button data-act="reject" data-id="${s._id}">Reject</button></div></td></tr>`).join("")}</tbody></table></div></div>` : ""}
   <div class="row between" style="align-items:flex-end;margin-top:6px"><h2 style="margin:0">📂 Students</h2>
     <div class="row"><input id="tSearch" type="text" placeholder="🔍 Search students" value="${esc(T.q || "")}" autocomplete="off" style="min-width:200px;min-height:48px;border-radius:999px;border:2px solid var(--line);padding:0 16px;font:inherit;font-size:16px;background:#fff">
     <select id="tSort" data-change="tSort"><option value="name" ${T.sort === "name" ? "selected" : ""}>Sort: name</option><option value="active" ${T.sort === "active" ? "selected" : ""}>Sort: last active</option><option value="level" ${T.sort === "level" ? "selected" : ""}>Sort: level</option><option value="streak" ${T.sort === "streak" ? "selected" : ""}>Sort: streak</option></select></div></div>
-  ${list.length ? `<div class="folders">${list.map(card).join("")}</div>` : `<div class="card">${buddy("happy", 64)}<h3>${real.length ? "No student matches that search" : "No students yet"}</h3>${real.length ? "" : `<p>Create a login in Firebase (Authentication → Users → Add user). When the student signs in on their phone, a folder for them appears here.</p>`}</div>`}
+  ${list.length ? `<div class="folders">${list.map(card).join("")}</div>` : `<div class="card">${buddy("happy", 64)}<h3>${real.length ? "No student matches that search" : "No students yet"}</h3>${real.length ? "" : `<p>When a parent creates an account and you approve it (or it takes a free beta spot), the student's folder appears here.</p>`}</div>`}
   ${test.length ? `<h3 style="margin-top:14px">🧪 Test accounts</h3><div class="folders">${test.map(card).join("")}</div>` : ""}
-  <div class="card"><h3>Add a new student</h3><ol class="small" style="margin:0;padding-left:18px;line-height:1.7"><li>Firebase console → Authentication → Users → <b>Add user</b> (their email + a password).</li><li>Give them the app link and their login.</li><li>When they sign in, they enter their name and age and take the level test. Their folder shows up here.</li></ol></div>`}`;
+  ${rejected.length ? `<details class="card"><summary><b>Rejected accounts (${rejected.length})</b></summary><div class="stack" style="gap:6px;margin-top:8px">${rejected.map(s => `<div class="row between"><span>${esc(studentLabel(s))} <span class="muted small">${esc(s.email || "")}</span></span><button data-act="unreject" data-id="${s._id}">Move back to waiting</button></div>`).join("")}</div></details>` : ""}
+  <div class="card"><h3>Add a new student</h3><ol class="small" style="margin:0;padding-left:18px;line-height:1.7"><li>Send the parent the app link: <b>${esc(location.origin + location.pathname)}</b></li><li>They tap <b>Create account</b>, then fill in the child's name and birthday (and parent consent if under 14).</li><li>The account appears above under <b>Waiting for approval</b>. Tap Approve and they can start.</li></ol></div>`}`;
   const si = document.getElementById("tSearch"); if (si) si.oninput = () => { T.q = si.value; const pos = si.selectionStart; renderTeacherList(); const n = document.getElementById("tSearch"); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} };
 }
 function renderTeacherStudent() {
@@ -1645,10 +1831,11 @@ function renderTeacherStudent() {
   const head = `<header class="t-head"><div class="row between"><div class="row" style="gap:12px"><button class="round" data-act="tBackList" aria-label="All students" style="background:rgba(255,255,255,.18);color:#fff">${I.back}</button>
       <span class="avatar big">${esc((nm[0] || "?").toUpperCase())}</span><div class="stack" style="gap:2px"><span class="eyebrow" style="color:rgba(255,255,255,.75)">📂 Students / ${esc(nm)}</span><h1>${esc(nm)}</h1></div></div>
     <div class="row"><button data-act="refresh">Refresh</button><button data-act="signout">Sign out</button></div></div>
-    ${st ? `<div class="row"><span class="streak-chip">${esc(stu && stu.email || "")}</span>${st.profile ? `<span class="streak-chip">age ${st.profile.age}</span>` : ""}${st.level ? `<span class="streak-chip">📈 ${esc(gradeWord(st.level.g))}</span>` : ""}<span class="streak-chip" style="color:#FFC93C">${I.flame.replace("<svg", '<svg width="16" height="16"')}<span style="color:#fff">${st.streak && st.streak.last >= addDays(today(), -1) ? st.streak.count : 0}-day streak</span></span><span class="streak-chip">Lv ${levelOf(st.xp || 0)} · ${st.xp || 0} XP</span><span class="streak-chip">${st.push && st.push.tokens && st.push.tokens.length ? "🔔 reminders on" : "🔕 reminders off"}</span>${st.lock && st.lock.on ? `<span class="streak-chip" style="background:#FF6B5B">quiz locked · training needed</span>` : ""}</div>` : ""}
+    ${st ? `<div class="row"><span class="streak-chip">${esc(stu && stu.email || "")}</span>${st.profile ? `<span class="streak-chip">age ${ageOf(st)}</span>` : ""}${st.level ? `<span class="streak-chip">📈 ${esc(gradeWord(st.level.g))}</span>` : ""}<span class="streak-chip" style="color:#FFC93C">${I.flame.replace("<svg", '<svg width="16" height="16"')}<span style="color:#fff">${st.streak && st.streak.last >= addDays(today(), -1) ? st.streak.count : 0}-day streak</span></span><span class="streak-chip">Lv ${levelOf(st.xp || 0)} · ${st.xp || 0} XP</span><span class="streak-chip">${st.push && st.push.tokens && st.push.tokens.length ? "🔔 reminders on" : "🔕 reminders off"}</span>${st.lock && st.lock.on ? `<span class="streak-chip" style="background:#FF6B5B">quiz locked · training needed</span>` : ""}</div>` : ""}
     <div class="row">${[["week", "Weekly report"], ["words", "Words"], ["placement", "Level"], ["settings", "Study plan"]].map(([k, l]) => `<button data-act="ttab" data-tab="${k}" aria-pressed="${T.tab === k}">${l}</button>`).join("")}</div></header>`;
   if (!st) { $app.innerHTML = head + `<div class="card">No data yet for this student.</div>`; return; }
-  const body = T.tab === "week" ? weekHtml() : T.tab === "words" ? wordsHtml() : T.tab === "placement" ? levelHtml() + placementHtml() : stuSettingsHtml() + (stu && stu.test ? testResetHtml() : "");
+  const surveyBtn = `<div class="card"><h3>Parent survey</h3><p class="muted small">Pops up automatically after 7 and 30 days. You can also send it now.</p><div class="row"><button data-act="tSurveyNow">${st.surveyNow ? "Survey requested ✓" : "Show the survey next time they open the app"}</button></div></div>`;
+  const body = T.tab === "week" ? weekHtml() : T.tab === "words" ? wordsHtml() : T.tab === "placement" ? levelHtml() + placementHtml() : stuSettingsHtml() + surveyBtn + (stu && stu.test ? testResetHtml() : `<div class="card"><h3>Delete this student's progress</h3><p class="muted small">Permanently deletes all words, scores, streak, XP, badges and level results. Their login stays. This can't be undone.</p><div class="row"><button data-act="tResetStu" style="color:#B3261E">Reset progress…</button></div></div>`);
   $app.innerHTML = head + body;
 }
 function weekHtml() {
@@ -1691,7 +1878,7 @@ function weekHtml() {
 }
 function wordsHtml() {
   const st = T.data.st; const W = T.data.words; if (!st.week) return `<div class="card">The first week starts after her word check.</div>`;
-  const row = id => { const e = BY[id], w = W[id]; return `<tr><td><b>${esc(e.w)}</b><br><span class="muted">${esc(e.ko)}</span></td><td>${w ? `${w.right}✓ ${w.wrong}✗` : "not seen"}</td><td>${w ? (w.box >= MASTER_BOX ? '<span class="pill good">mastered</span>' : `<span class="pill ${w.box ? "" : "bad"}">level ${w.box}/${MASTER_BOX}</span>`) : "–"}</td><td><button class="ghost" data-act="rmWord" data-id="${id}">Remove</button></td></tr>`; };
+  const row = id => { const e = BY[id], w = W[id]; return `<tr><td><b>${esc(e.w)}</b> ${krBadge(e)}<br><span class="muted">${esc(e.ko)}</span></td><td>${w ? `${w.right}✓ ${w.wrong}✗` : "not seen"}</td><td>${w ? (w.box >= MASTER_BOX ? '<span class="pill good">mastered</span>' : `<span class="pill ${w.box ? "" : "bad"}">level ${w.box}/${MASTER_BOX}</span>`) : "–"}</td><td><button class="ghost" data-act="rmWord" data-id="${id}">Remove</button></td></tr>`; };
   const sim = clone(st); buildWeek(sim, W, effCfg(st), true); const next = sim.week.newIds.map(id => BY[id].w + (BY[id].book === "G" ? "" : "*")); const c = effCfg(st);
   return `<p class="muted">Week of ${wkLabel(st.week.key)}. ${c.textbook ? `${c.tbNew} new textbook words (book order from Unit ${c.startUnit}) + ` : ""}${c.grNew} new words from the graded list${st.level ? ` (just above ${gradeWord(st.level.g)})` : ""}, plus ${c.reviewPerWeek} review words. Change this in Settings.</p>
    <div class="card"><div class="row" style="align-items:flex-end"><div class="field" style="flex:1;min-width:200px"><label for="addWord">Add a word to this week</label><input id="addWord" type="text" list="bankList" placeholder="Type a word from the books" autocomplete="off" autocapitalize="off"><datalist id="bankList">${BANK.map(e => `<option value="${esc(e.w)}">`).join("")}</datalist></div><button class="primary" data-act="addWord">Add</button><button data-act="release">Start next week now</button></div></div>
@@ -1710,7 +1897,7 @@ function placementHtml() {
 }
 function levelHtml() {
   const st = T.data.st; const L = st.level;
-  const prof = st.profile ? `<p class="muted">${esc(st.profile.name)} · age ${st.profile.age} · ${SET(st).lang === "en" ? "English only" : "English + Korean"}</p>` : `<p class="muted">She hasn't filled in her name and age yet.</p>`;
+  const prof = st.profile ? `<p class="muted">${esc(st.profile.name)} · age ${ageOf(st)} · ${SET(st).lang === "en" ? "English only" : "English + Korean"}</p>` : `<p class="muted">She hasn't filled in her name and age yet.</p>`;
   if (!L) return `<div class="card"><h2>Word level</h2>${prof}<p>She hasn't taken the level test yet. It opens the next time she signs in.</p></div>`;
   const att = T.data.atts.find(a => a.id === L.att) || T.data.atts.filter(a => a.kind === "level" && a.end).sort((a, b) => b.start - a.start)[0];
   const H = st.levelHist || [];
@@ -1732,19 +1919,26 @@ function stuSettingsHtml() {
    <div class="field"><label for="sTb">Textbook words</label><select id="sTb"><option value="1" ${s.textbook ? "selected" : ""}>On</option><option value="0" ${s.textbook ? "" : "selected"}>Off (graded list only)</option></select></div>
    <div class="field"><label for="sTbNew">New textbook words per week</label><input id="sTbNew" type="number" min="0" max="40" value="${s.tbNew}"></div>
    <div class="field"><label for="sStart">Textbook starts at unit</label><input id="sStart" type="number" min="1" max="30" value="${s.startUnit || CFG.startUnit}"></div>
+   <div class="field"><label for="sKor">Korean school words (교육부 기본 어휘 3,000) first</label><select id="sKor"><option value="1" ${(s.kor != null ? s.kor : s.lang !== "en") ? "selected" : ""}>On</option><option value="0" ${(s.kor != null ? s.kor : s.lang !== "en") ? "" : "selected"}>Off</option></select></div>
    <div class="field"><label for="sGrNew">New graded-list words per week</label><input id="sGrNew" type="number" min="0" max="40" value="${s.grNew}"></div>
    <div class="field"><label for="sRev">Review words per week</label><input id="sRev" type="number" min="0" max="30" value="${s.review}"></div>
-   <div class="field"><label for="sGoal">Goal level (grade, 0 = K)</label><input id="sGoal" type="number" min="0" max="9" step="0.1" value="${st.goal ? st.goal.g : ""}"></div>
+   <div class="field"><label for="sGoal">Goal level (grade, 0 = K)</label><input id="sGoal" type="number" min="0" max="13" step="0.1" value="${st.goal ? st.goal.g : ""}"></div>
    <div class="field"><label for="sGoalBy">Goal date</label><input id="sGoalBy" type="date" value="${st.goal ? st.goal.by : ""}"></div>
-   <div class="field"><label for="sLevel">Word level (change only to correct it)</label><input id="sLevel" type="number" min="0" max="9" step="0.1" value="${st.level ? st.level.g : ""}"></div>
+   <div class="field"><label for="sLevel">Word level (change only to correct it)</label><input id="sLevel" type="number" min="0" max="13" step="0.1" value="${st.level ? st.level.g : ""}"></div>
    <div class="field"><label for="cfgSize">Daily quiz size</label><input id="cfgSize" type="number" min="5" max="30" value="${st.quizSize}"></div>
   </div>
+  ${st.planBy && st.planBy.who === "student" ? `<p class="small"><span class="pill sun">Changed by the student/parent on ${new Date(st.planBy.at).toLocaleDateString()}</span></p>` : ""}
   <p class="muted small">Graded-list words start just above her level and move up as she learns them. Changes apply from next week's words (or tap "Start next week now" on the Words tab).</p>
   <div class="row"><button class="primary" data-act="saveStu">Save ${esc(nm)}'s plan</button></div></div>`;
 }
 function testResetHtml() { return `<div class="card"><h3>Test data</h3><p class="muted">Deletes everything you created with "Try as student". Real students' data is not touched.</p><div class="row"><button data-act="resetTest">Reset test data</button></div></div>`; }
+function betaHtml() { const B = T.beta || {};
+  return `<div class="card"><h2>Free beta sign-ups</h2><p class="muted small">New accounts are approved automatically until the free spots run out. After that, people see "Sorry, all free beta spots are filled. You're on the official launch list" and wait under <b>Waiting for approval</b> (you can still approve them by hand).</p>
+  <div class="grid2"><div class="field"><label for="bOn">Auto-approve</label><select id="bOn"><option value="1" ${B.on ? "selected" : ""}>On</option><option value="0" ${B.on ? "" : "selected"}>Off (approve everyone by hand)</option></select></div>
+  <div class="field"><label for="bCap">Free spots</label><input id="bCap" type="number" min="0" max="10000" value="${B.cap != null ? B.cap : 50}"></div></div>
+  <p><b>${B.count || 0}</b> of ${B.cap != null ? B.cap : 50} spots used.</p><div class="row"><button class="primary" data-act="saveBeta">Save</button></div></div>`; }
 function settingsHtml() {
-  return `<div class="card"><h2>Settings for everyone</h2>
+  return betaHtml() + `<div class="card"><h2>Settings for everyone</h2>
   <div class="grid2">
    <input id="cfgStart" type="hidden" value="${CFG.startUnit}"><input id="cfgNew" type="hidden" value="${CFG.newPerWeek}"><input id="cfgRev" type="hidden" value="${CFG.reviewPerWeek}">
    <div class="field"><label for="cfgPass">Pass mark for the daily quiz (%)</label><input id="cfgPass" type="number" min="50" max="100" value="${CFG.passPct}"></div>
@@ -1770,6 +1964,36 @@ document.addEventListener("click", async ev => {
   if (a === "menuSignout") { if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to sign out"; return; } closeMenu(); leaveActivity(); await WW.signOut(); return location.reload(); }
   if (a === "pushAskYes") { closePushAsk(); return turnOnPush(); }
   if (a === "pushAskNo") return closePushAsk();
+  if (a === "checkApproved") return checkApproved();
+  if (a === "lgMode") { view = { name: "login", mode: b.dataset.m }; return render(); }
+  if (a === "resetMe") return resetAsk(1);
+  if (a === "resetStep2") return resetAsk(2);
+  if (a === "resetCancel") { const el = document.getElementById("resetAsk"); if (el) el.remove(); return; }
+  if (a === "resetGo") return resetGo();
+  if (a === "feedback") { closeMenu(); return feedbackAsk(); }
+  if (a === "fbRate") { document.querySelectorAll('[data-act="fbRate"]').forEach(x => x.classList.toggle("sel", x === b)); return; }
+  if (a === "fbSend") return feedbackSend();
+  if (a === "svStar") { svKeepText(); SV.stars = +b.dataset.n; return drawSurvey(); }
+  if (a === "svPick") { svKeepText(); const q = SURVEY.find(x => x.k === b.dataset.k); const v = q.type === "scale" ? +b.dataset.v : b.dataset.v;
+    if (q.type === "multi") { const arr = SV.a[q.k] || []; SV.a[q.k] = arr.includes(v) ? arr.filter(x => x !== v) : arr.concat([v]); } else SV.a[q.k] = v; return drawSurvey(); }
+  if (a === "svSend") return surveySend();
+  if (a === "svLater") return surveyLater();
+  if (a === "menuSurvey") { closeMenu(); return openSurvey("now"); }
+  if (a === "tSurveyNow") { const d = (await db.doc("students/" + T.sel).get()).data(); d.surveyNow = true; await setDoc("students/" + T.sel, d); T.data.st.surveyNow = true; toast("The survey will pop up next time they open the app"); return render(); }
+  if (a === "fbClose") { const el = document.getElementById("fbAsk"); if (el) el.remove(); return; }
+  if (a === "approve" || a === "reject") { const id = b.dataset.id; const s = T.students.find(x => x._id === id); if (!s) return; const d = (await db.doc("students/" + id).get()).data();
+    if (a === "approve") { d.approved = true; d.rejected = false; d.waitlist = false; d.approvedAt = Date.now(); } else { if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to reject"; return; } d.approved = false; d.rejected = true; }
+    await setDoc("students/" + id, d); toast(a === "approve" ? "Approved " + studentLabel(d) : "Rejected"); return loadTeacher(); }
+  if (a === "saveBeta") { const on = document.getElementById("bOn").value === "1", cap = Math.max(0, +document.getElementById("bCap").value || 0); T.beta = Object.assign({ count: 0 }, T.beta || {}, { on, cap }); await setDoc("config/beta", T.beta); toast("Saved"); return render(); }
+  if (a === "approveAll") { if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to approve all"; return; }
+    for (const s of T.students.filter(x => x.approved === false && !x.rejected)) { const d = (await db.doc("students/" + s._id).get()).data(); d.approved = true; d.approvedAt = Date.now(); await setDoc("students/" + s._id, d); }
+    toast("All approved"); return loadTeacher(); }
+  if (a === "unreject") { const id = b.dataset.id; const d = (await db.doc("students/" + id).get()).data(); d.rejected = false; d.approved = false; await setDoc("students/" + id, d); return loadTeacher(); }
+  if (a === "tFeedback") { T.view = "list"; T.tab = "feedback"; T.fb = null; render(); return loadFeedback(); }
+  if (a === "tResetStu") { if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again: permanently delete this student's progress"; return; }
+    const d = (await db.doc("students/" + T.sel).get()).data(); await wipeStudent(T.sel, d); toast("Progress deleted"); await loadStudentData(T.sel); await loadTeacher(); return; }
+  if (a === "privacy") { ev.preventDefault(); document.body.insertAdjacentHTML("beforeend", privacyHtml()); return; }
+  if (a === "privacyClose") { const el = document.getElementById("privacy"); if (el) el.remove(); return; }
   if (a === "obLang") { ST._lang = b.dataset.v; document.querySelectorAll('[data-act="obLang"]').forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); return; }
   if (a === "setLang") { ST.settings = Object.assign({}, ST.settings || {}, { lang: b.dataset.v }); saveST(); return render(); }
   if (a === "startLevel") return startLevelTest(false);
@@ -1871,25 +2095,48 @@ document.addEventListener("submit", ev => { ev.preventDefault(); const f = ev.ta
     if (norm(el.value) === norm(BY[id].w)) { if (f === "fixQuiz") RUN.fixed = true; else TR.fixed = true; render(); }
     else { el.value = ""; el.focus(); toast("Not quite. Look at the word and try again"); } } });
 document.addEventListener("change", async ev => {
+  if (ev.target.dataset.change === "myPlan") return savePlan();
+  if (ev.target.dataset.change === "obDob") { stashOnboard(); ST._dob = ev.target.value; return render(); }
   if (ev.target.dataset.change === "tSort") { T.sort = ev.target.value; return render(); }
   if (ev.target.dataset.change === "voice") { VOICE = VOICES.find(v => v.name === ev.target.value) || VOICE; try { localStorage.setItem("ww_voice", VOICE.name); } catch (e) {} say("Hello! This is how your words will sound."); } });
 async function enterPreview() { mode = "student"; SID = ME; TAB = "today"; await loadStudent(true); }
 
 /* ---------- login ---------- */
 function renderLogin() {
+  const m = view.mode || "in"; const field = (id, label, type, ac, extra) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" autocomplete="${ac}" autocapitalize="off" autocorrect="off" spellcheck="false" ${extra || ""}></div>`;
+  const tabs = `<div class="seg" style="width:100%"><button type="button" data-act="lgMode" data-m="in" aria-pressed="${m === "in"}" style="flex:1">Sign in</button><button type="button" data-act="lgMode" data-m="up" aria-pressed="${m === "up"}" style="flex:1">Create account</button></div>`;
+  let body;
+  if (m === "forgot") body = `<h2>Forgot password?</h2><p class="muted small">Type your email. We'll send a link to make a new password. 비밀번호 재설정 링크를 이메일로 보내 드려요.</p>${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}
+    ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}${view.ok ? `<div class="fb good">${esc(view.ok)}</div>` : ""}<button class="big primary" type="submit">Send reset link</button><button type="button" class="ghost" data-act="lgMode" data-m="in" style="align-self:center">Back to sign in</button>`;
+  else if (m === "up") body = `${tabs}<p class="muted small">Parents: create one account for each child. Your teacher approves new accounts before they can start. 새 계정은 선생님 승인 후 사용할 수 있어요.</p>
+    ${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}${field("lgPw", "Password (6+ characters)", "password", "new-password")}${field("lgPw2", "Type the password again", "password", "new-password")}
+    ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Create account</button>`;
+  else body = `${tabs}${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}${field("lgPw", "Password", "password", "current-password")}
+    ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Sign in</button><button type="button" class="ghost" data-act="lgMode" data-m="forgot" style="align-self:center">Forgot password?</button>`;
   $app.innerHTML = `<section class="hero" style="text-align:center;padding-bottom:80px"><div class="stack" style="align-items:center;gap:10px;padding-top:30px">${buddy("happy", 110)}<h1>Vocaboo</h1><p class="muted">Train your words every day</p></div></section>
-  <form class="card" data-form="login" style="margin-top:-56px;position:relative"><h2>Sign in</h2><p class="muted small">Use the email and password your teacher gave you. You only need to do this once on this phone.</p>
-  <div class="field"><label for="lgEmail">Email</label><input id="lgEmail" type="text" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
-  <div class="field"><label for="lgPw">Password</label><input id="lgPw" type="password" autocomplete="current-password"></div>
-  ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Sign in</button></form>`;
+  <form class="card" data-form="login" style="margin-top:-56px;position:relative">${body}</form>`;
 }
-async function doLogin() { const em = document.getElementById("lgEmail").value, pw = document.getElementById("lgPw").value; if (!em || !pw) return;
-  try { await WW.signIn(em, pw); } catch (e) { view = { name: "login", err: /invalid|wrong|not-found|credential/.test(e.code || "") ? "That email or password isn't right. Check with your teacher." : "Couldn't sign in: " + (e.code || e.message) }; render(); } }
+const authMsg = e => { const c = (e && e.code) || ""; return /invalid-email/.test(c) ? "That email doesn't look right." : /email-already-in-use/.test(c) ? "An account with this email already exists. Try signing in." : /weak-password/.test(c) ? "Use a password with at least 6 characters." : /invalid|wrong|not-found|credential/.test(c) ? "That email or password isn't right." : /too-many/.test(c) ? "Too many tries. Wait a few minutes and try again." : "Something went wrong: " + (c || (e && e.message)); };
+async function doLogin() { const m = view.mode || "in"; const em = (document.getElementById("lgEmail") || {}).value || "", pw = (document.getElementById("lgPw") || {}).value || "";
+  if (!em) return;
+  try {
+    if (m === "forgot") { await WW.resetPassword(em); view = { name: "login", mode: "forgot", ok: "Check your email for the reset link (look in spam too)." }; return render(); }
+    if (!pw) return;
+    if (m === "up") { if (pw !== ((document.getElementById("lgPw2") || {}).value || "")) { view = { name: "login", mode: "up", err: "The two passwords don't match." }; return render(); } await WW.signUp(em, pw); return; }
+    await WW.signIn(em, pw);
+  } catch (e) { view = { name: "login", mode: m, err: authMsg(e) }; render(); } }
 
 /* ---------- boot ---------- */
 async function loadStudent(test) {
   const sd = await db.doc(sPath()).get();
   ST = sd.exists ? clone(sd.data()) : newStudent(test);
+  if (!sd.exists && !test) { // new sign-up: free beta seat if any are left, otherwise the launch list
+    ST.approved = false; ST.email = (WW.user() && WW.user().email) || "";
+    try { const bd = await db.doc("config/beta").get(); const B = bd.exists ? bd.data() : null;
+      if (B && B.on && (B.count || 0) < (B.cap || 0) && db.batch) { const seat = (B.count || 0) + 1; const st2 = Object.assign(clone(ST), { approved: true, betaSeat: seat, approvedAt: Date.now() });
+        await db.batch([{ type: "set", path: sPath(), data: st2 }, { type: "update", path: "config/beta", data: { count: seat } }]); ST = st2; }
+      else if (B && B.on) ST.waitlist = true;
+    } catch (e) { console.warn("beta seat", e); ST.approved = false; ST.waitlist = true; } }
   const em = WW.user() && WW.user().email; if (em && ST.email !== em && !test) { ST.email = em; await saveST(); } else if (!sd.exists) await saveST();
   const words = await getAll(sPath() + "/words"); WORDS = {}; words.forEach(w => { const id = w._id; delete w._id; WORDS[id] = w; });
   if (readyForWeeks()) {
@@ -1899,7 +2146,7 @@ async function loadStudent(test) {
     loadPacksFor(weekIds());
   }
   ST.lastSeen = Date.now(); saveST();
-  trackStudent(); PROG = null;
+  if (ST.approved !== false && !ST.rejected) trackStudent(); PROG = null;
   view = { name: studentHome() }; render();
 }
 let booted = false;
