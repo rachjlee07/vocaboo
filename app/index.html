@@ -262,6 +262,27 @@ body.txt-l #app,body.txt-l #tabs{zoom:1.12}body.txt-xl #app,body.txt-xl #tabs{zo
 .map-wrap{border-radius:26px;overflow:hidden;margin:12px 0;box-shadow:var(--shadow)}
 .isle-pulse{animation:islePulse 1.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
 @keyframes islePulse{0%,100%{opacity:.35;transform:scale(.92)}50%{opacity:1;transform:scale(1.06)}}
+
+.save-x{min-height:44px;padding:0 14px;background:#fff;box-shadow:var(--shadow);font-weight:800;font-size:14px;white-space:nowrap;flex:none}
+.countdown{font-size:84px;font-weight:900;color:var(--violet,#5B3FD9);line-height:1;animation:cdpop 1s ease-out infinite}
+@keyframes cdpop{0%{transform:scale(1.35);opacity:.3}30%{transform:scale(1);opacity:1}100%{transform:scale(.95);opacity:.85}}
+.blanks{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;font-size:30px;font-weight:800;margin:4px 0;letter-spacing:0}
+.blanks span{min-width:22px;text-align:center;color:var(--muted,#888)}
+.blanks span.rev{color:var(--violet,#5B3FD9);border-bottom:3px solid currentColor}
+.blanks span.gap{min-width:10px}
+.grade-tap{cursor:pointer;border:0;font:inherit;font-weight:800}.streak-chip.grade-tap{color:#fff}
+.gtable{width:100%;border-collapse:collapse;font-size:15px}.gtable td{padding:7px 6px;border-bottom:1px solid #eee;vertical-align:top}.gtable td:first-child{font-weight:800;white-space:nowrap}
+
+.intro-wrap{min-height:80vh;display:grid;place-items:center;padding:20px 0}
+.intro-card{gap:14px;max-width:440px;width:100%;animation:introIn .25s ease-out}
+@keyframes introIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.intro-ic{font-size:64px;line-height:1;min-height:100px;display:grid;place-items:center}
+.intro-dots{display:flex;gap:8px;justify-content:center}.intro-dots i{width:10px;height:10px;border-radius:50%;background:var(--line,#ddd)}.intro-dots i.on{background:var(--violet,#5B3FD9);width:26px;border-radius:6px}.intro-dots i.done{background:#b9aef5}
+
+.flash-card{min-height:300px;display:flex;flex-direction:column;justify-content:center;width:100%;text-align:left;border:0;cursor:pointer;font:inherit;color:inherit;animation:flin .25s ease-out}
+.flash-card.flipped{animation:flflip .3s ease-out}
+@keyframes flin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes flflip{from{transform:rotateY(80deg);opacity:.4}to{transform:none;opacity:1}}
 </style>
 </head>
 <body>
@@ -272,7 +293,7 @@ body.txt-l #app,body.txt-l #tabs{zoom:1.12}body.txt-xl #app,body.txt-xl #tabs{zo
 <script src="config.js?v=3e8cab0bd4"></script>
 <script src="words.js?v=d28539be18"></script>
 <script src="stories.js?v=453278059e"></script>
-<script src="app.js?v=0f02b56ed4"></script>
+<script src="app.js?v=867d31d1b5"></script>
 <script type="module" src="fb.js?v=f085917ce6"></script>
 </body>
 </html>
