@@ -222,7 +222,7 @@ async function speak(id, tag) {
   if (got && playSrc(got[0], got[1], () => say(text, rate))) return;
   say(text, rate);
 }
-function stopAudio() { try { player.pause(); } catch (e) {} if ("speechSynthesis" in window) speechSynthesis.cancel(); }
+function stopAudio() { try { if (typeof STORY !== "undefined" && STORY) { STORY.playing = null; STORY.paused = false; } } catch (e) {} try { player.pause(); } catch (e) {} if ("speechSynthesis" in window) speechSynthesis.cancel(); }
 const spk = (id, tag, label, cls) => `<button class="${cls || "round"} ${label ? "icon-l" : ""}" data-act="speak" data-id="${id}" data-tag="${tag}" aria-label="${label || "Listen"}">${ICON_SPK}${label ? " " + label : ""}</button>`;
 
 /* ---------- icons & art ---------- */
@@ -242,6 +242,7 @@ const I = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
   chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m9 5 7 7-7 7"/></svg>',
   reload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
+  map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m15 5-7 7 7 7"/></svg>'
 };
 function buddy(mood, size, body) { // original mascot: a word-card buddy
@@ -312,7 +313,7 @@ function setShell(kind) { // kind: tabs | focus | teacher | bare
   const tabs = document.getElementById("tabs");
   if (kind !== "tabs") { tabs.innerHTML = ""; return; }
   const t = (k, l, ic) => `<button data-act="tabgo" data-tab="${k}" ${TAB === k ? 'aria-current="page"' : ""}>${ic}<span>${l}</span></button>`;
-  tabs.innerHTML = `<div class="tabbar"><nav>${t("today", "Today", I.home)}${t("words", "Words", I.cards)}${t("progress", "Progress", I.chart)}${t("me", "Me", I.me)}</nav></div>`;
+  tabs.innerHTML = `<div class="tabbar"><nav>${t("today", "Today", I.home)}${t("map", "Map", I.map)}${t("words", "Words", I.cards)}${t("progress", "Progress", I.chart)}${t("me", "Me", I.me)}</nav></div>`;
 }
 function previewBar() { return IS_OWNER ? `<div class="notice info row between" style="margin-top:12px"><span>Student preview (test data)</span><button class="ghost" data-act="toTeacher">Dashboard</button></div>` : ""; }
 function render() { renderInner(); drawGear(); fitWords(); }
@@ -327,11 +328,14 @@ function renderInner() {
   if (v === "error") { setShell("bare"); $app.innerHTML = `<div class="splash"><div class="card" style="text-align:left">${buddy("sad", 80)}<h2>Something went wrong</h2><p>${esc(view.msg)}</p><div class="row"><button class="primary" data-act="reload">Try again</button><button class="ghost" data-act="signout">Sign out</button></div></div></div>`; return; }
   if (v === "placementIntro") { setShell("bare"); return renderPlacementIntro(); }
   if (v === "onboard") { setShell("bare"); return renderOnboard(); }
+  if (v === "who") { setShell("bare"); return renderWho(); }
+  if (v === "parent") { setShell("focus"); return renderParent(); }
   if (v === "pending" || v === "rejected") { setShell("bare"); return renderPending(v === "rejected"); }
   if (v === "levelIntro") { setShell("bare"); return renderLevelIntro(); }
   if (v === "level") { setShell("focus"); return renderLevel(); }
   if (v === "levelResult") { setShell("focus"); return renderLevelResult(); }
   if (v === "testoutResult") { setShell("focus"); return renderTestOutResult(); }
+  if (v === "bossResult") { setShell("focus"); return renderBossResult(); }
   if (v === "run") { setShell("focus"); return renderRun(); }
   if (v === "train") { setShell("focus"); return renderTrain(); }
   if (v === "result") { setShell("focus"); return renderResult(); }
@@ -341,18 +345,19 @@ function renderInner() {
   if (v === "story") { setShell("focus"); return renderStory(); }
   setShell("tabs");
   if (TAB === "today") return renderToday();
+  if (TAB === "map") return renderMap();
   if (TAB === "words") return renderWords();
   if (TAB === "progress") return renderProgress();
   if (TAB === "me") return renderMe();
 }
 const wsz = w => w.length > 13 ? "font-size:30px" : w.length > 10 ? "font-size:36px" : "";
-function streakNow() { const s = ST.streak || {}; if (s.last === today() || s.last === addDays(today(), -1)) return s.count || 0; return 0; }
+function streakNow() { const s = ST.streak || {}; return streakAlive(s, today()) ? s.count || 0 : 0; }
 function quizDoneToday() { return ST.lastQuizDay === today(); }
 function greeting() { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; }
 
 /* ---------- Today ---------- */
 function renderToday() {
-  const s = streakNow(); const wk = ST.week; const k = wk ? wk.key : weekKey(); const ids = weekIds();
+  saveStars(); const s = streakNow(); const wk = ST.week; const k = wk ? wk.key : weekKey(); const ids = weekIds();
   const needIntro = wk && !wk.introDone && !IS_OWNER; const locked = ST.lock && ST.lock.on && !IS_OWNER; const qd = quizDoneToday();
   const trained = wk ? (wk.trained || []).length : 0; const mastered = ids.filter(isMastered).length;
   const days = []; for (let i = 0; i < 7; i++) { const d = addDays(k, i); const dt = new Date(d + "T12:00:00");
@@ -383,7 +388,7 @@ function renderToday() {
   const bonusCard = card({ key: "bonus", act: "trainWeak", done: false, title: "Practice tricky words", pct: bonusPct, eyebrow: "Bonus", meta: `<span>${weak} not mastered yet</span>`, art: ART.bonus });
   $app.innerHTML = `${previewBar()}<section class="hero" data-tour="hero"><span class="deco" style="width:160px;height:160px;right:-40px;top:-50px"></span><span class="deco" style="width:70px;height:70px;left:-20px;bottom:30px"></span>
     <div class="hero-row"><div class="stack" style="gap:8px;flex:1"><div class="row between" style="padding-right:48px"><span class="muted" style="font-weight:800">${greeting()}${firstName() ? ", " + esc(firstName()) : ""}!</span></div><h1>${needIntro ? "New words this week" : locked ? "Let's fix those words" : qd ? "All done today" : "Ready to train?"}</h1>
-    <div class="row"><span class="streak-chip" style="color:#FFC93C">${I.flame.replace("<svg", '<svg width="18" height="18"')}<span style="color:#fff">${s} day streak</span></span><span class="streak-chip">${mastered}/${ids.length} mastered</span>${ST.level ? `<span class="streak-chip">📈 ${esc(gradeWord(ST.level.g))}</span>` : ""}</div>${levelBar()}</div>
+    <div class="row"><span class="streak-chip" style="color:#FFC93C">${I.flame.replace("<svg", '<svg width="18" height="18"')}<span style="color:#fff">${s} day streak</span></span>${ST.freezes ? `<span class="streak-chip" title="Streak freezes">❄️ ${ST.freezes}</span>` : ""}<span class="streak-chip">${mastered}/${ids.length} mastered</span>${ST.level ? `<span class="streak-chip">📈 ${esc(gradeWord(ST.level.g))}</span>` : ""}</div>${levelBar()}</div>
     ${buddy(qd ? "wow" : "happy", 92)}</div></section>
     <div class="week" aria-label="This week" data-tour="week">${days.join("")}</div>
     ${inappBanner()}${installBanner()}
@@ -429,7 +434,7 @@ function renderWordCard() { const e = BY[view.id];
 let PROG = null, PROG_RANGE = "week"; let tourAsked = false;
 async function loadProgress() { const [atts, sess] = await Promise.all([getAll(sPath() + "/attempts"), getAll(sPath() + "/sessions")]); PROG = { atts, sess, at: Date.now() }; }
 function renderProgress() {
-  if (!PROG) { $app.innerHTML = `${previewBar()}<div class="splash"><p class="muted">Loading your progress…</p></div>`; loadProgress().then(render).catch(() => { PROG = { atts: [], sess: [] }; render(); }); return; }
+  if (!PROG) { $app.innerHTML = `${previewBar()}${loaderHtml("Loading your progress… 📈")}`; loadProgress().then(render).catch(() => { PROG = { atts: [], sess: [] }; render(); }); return; }
   const wk = weekKey(); const allTime = PROG_RANGE === "all";
   const atts = PROG.atts.filter(a => (a.kind !== "placement" && a.kind !== "level") && (allTime || a.weekKey === wk));
   const items = atts.flatMap(a => a.items || []);
@@ -467,8 +472,9 @@ function renderMe() {
   const email = (WW.user() && WW.user().email) || "";
   $app.innerHTML = `${previewBar()}<div class="stack" style="padding-top:18px;align-items:center;text-align:center">${buddy("happy", 96)}<h1>${esc(firstName() || email.split("@")[0] || "Me")}</h1><p class="muted">${esc(email)}${ST.level ? " · " + esc(gradeWord(ST.level.g)) : ""}</p></div>
    <div class="card"><h3>This week's goal</h3>${goalHtml()}</div>
-   ${planCard()}
-   <div class="card"><h3>Word meanings</h3><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">English + 한국어</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
+   <button class="big primary icon-l" data-act="openParent">👨‍👩‍👧 For parents · 부모님 ${FAMPIN ? "🔒" : ""}</button>
+   ${textCard()}
+   <div class="card"><h3>Streak freezes ❄️</h3><p class="muted small">You have <b>${ST.freezes || 0}</b> of 2. A freeze saves your streak if you miss one day. Earn one for every 5 daily quizzes.</p></div>
    <div class="card"><div class="row between"><h3>Level ${levelInfo().n}</h3><span class="pill sun">${ST.xp || 0} XP</span></div>${levelBar()}<p class="muted small">Earn XP for every right answer, word you learn, sentence and story.</p></div>
    <div class="card"><div class="row between"><h3>Badges</h3><span class="pill">${Object.keys(ST.badges || {}).length}/${BADGES.length}</span></div>${badgeGrid()}</div>
    ${pushCard()}
@@ -478,8 +484,7 @@ function renderMe() {
    <div class="card"><h3>Sounds</h3><p class="muted">Words and sentences play recorded audio. If a word has no recording yet, your phone's voice reads it. Pick that voice above.</p></div>
    <button class="big icon-l" data-act="feedback">💬 Send feedback</button>
    <button class="big icon-l" data-act="reload">${I.reload} Reload app</button>
-   ${IS_OWNER ? "" : `<button class="big" data-act="signout">Sign out</button>`}
-   ${resetCard()}`;
+   ${IS_OWNER ? "" : `<button class="big" data-act="menuSwitch">👥 Switch child</button>`}`;
 }
 
 /* ---------- quiz & placement ---------- */
@@ -533,7 +538,7 @@ function renderRun() {
     if (enTyped && !RUN.ok && !RUN.fixed) fb += fixForm(e, "fixQuiz");
     else fb += `${enTyped && !RUN.ok ? `<div class="fb good">Good. Now you've spelled it right.</div>` : ""}` + nextBtn;
   }
-  $app.innerHTML = `${topbar(RUN.i, RUN.qs.length)}<span class="eyebrow">${RUN.kind === "placement" ? "Word check" : RUN.kind === "testout" ? "Test-out quiz · need 80%" : "Daily quiz"}</span><div class="card">${qPrompt(q)}${body}${fb}</div>`;
+  $app.innerHTML = `${topbar(RUN.i, RUN.qs.length)}<span class="eyebrow">${RUN.kind === "placement" ? "Word check" : RUN.kind === "testout" ? "Test-out quiz · need 80%" : RUN.kind === "boss" ? "👑 Boss review · need 80%" : "Daily quiz"}</span><div class="card">${qPrompt(q)}${body}${fb}</div>`;
   const inp = document.getElementById("ans"); if (inp && !RUN.answered) inp.focus();
   const fx = document.getElementById("fix"); if (fx) fx.focus();
 }
@@ -577,6 +582,7 @@ function next() {
 }
 function finishRun() {
   if (RUN.kind === "testout") return finishTestOut();
+  if (RUN.kind === "boss") return finishBoss();
   const n = RUN.qs.length, score = RUN.right / n;
   ATT.end = Date.now(); ATT.score = score;
   const wrongIds = [...new Set(ATT.items.filter(i => !i.ok).map(i => i.id))];
@@ -587,8 +593,7 @@ function finishRun() {
     buildWeek(ST, WORDS, effCfg(ST), true); loadPacksFor(weekIds());
   } else {
     const d = today(); const s = ST.streak || { count: 0, best: 0, last: "" };
-    if (s.last !== d) { s.count = s.last === addDays(d, -1) ? (s.count || 0) + 1 : 1; s.last = d; s.best = Math.max(s.best || 0, s.count); }
-    ST.streak = s; ST.lastQuizDay = d; ST.quizDays = (ST.quizDays || []).filter(x => x >= addDays(d, -40)).concat(ST.quizDays && ST.quizDays.includes(d) ? [] : [d]);
+    ST.streak = streakUpdate(d); ST.lastQuizDay = d; ST.quizDays = (ST.quizDays || []).filter(x => x >= addDays(d, -40)).concat(ST.quizDays && ST.quizDays.includes(d) ? [] : [d]);
     if (score * 100 < CFG.passPct) { ST.lock = { on: true, ids: wrongIds, since: Date.now(), quiz: ATT.id }; ATT.locked = true; ST.lockCount = (ST.lockCount || 0) + 1; }
     bumpStat("quizzes"); award(20, "quiz done"); if (RUN.right === n) { bumpStat("perfect"); award(50, "perfect"); }
     if (new Date().getHours() < 8) bumpStat("early");
@@ -990,7 +995,7 @@ function coachListen() {
 function renderCoach() {
   const e = BY[CO.ids[CO.i]]; const r = CO.res;
   let body;
-  if (CO.busy) body = `<div class="stack" style="align-items:center;text-align:center;padding:20px 0">${buddy("happy", 80)}<p class="muted" style="font-weight:800">Checking your sentence…</p></div>`;
+  if (CO.busy) body = loaderHtml("Checking your sentence… 🧐");
   else if (r && !r.error && !r.offline) body = `
     <div class="fb ${r.correct ? "good" : ""} stack" style="gap:4px;${r.correct ? "" : "background:var(--sun-soft);color:var(--sun-ink)"}"><b>${esc(CO.head || (r.correct ? "Great sentence! 🌟" : "Good try! 💪"))}</b>${r.praise ? `<span style="font-weight:600">${esc(r.praise)}</span>` : ""}</div>
     <div class="stack" style="gap:6px"><p class="label">You said</p><p style="font-size:18px">${esc(CO.text)}</p></div>
@@ -1098,13 +1103,18 @@ function blankSentence(e) { const re = new RegExp("\\b" + e.w.replace(/[.*+?^${}
 /* ---------- weekly story (read a part → answer → next part) ---------- */
 let STORY = null;
 const storyPath = () => sPath() + "/stories/" + weekKey();
+function storyShape() { const lv = ST.level ? ST.level.g : 2, age = ageOf(ST) || 11; const g = Math.max(lv, Math.min(age - 6, lv + 1));
+  if (g < 3.5) return { parts: 4, words: "45-65", q: 2, kinds: "1 about what happened, 1 about what a target word means there" };
+  if (g < 6.5) return { parts: 4, words: "80-110", q: 3, kinds: "1 about what happened, 1 about why a character did something or how they felt (inference), 1 about what a target word means there" };
+  if (g < 9.5) return { parts: 5, words: "120-160", q: 4, kinds: "1 main idea, 1 detail, 1 inference, 1 about what a target word means in context" };
+  return { parts: 5, words: "160-210", q: 4, kinds: "1 main idea or theme, 1 inference, 1 author's purpose or tone, 1 about what a target word means in context" }; }
 function storyPrompt(ids) {
   const list = ids.map(id => `${BY[id].w} (${senseList(BY[id]).map(s => KO() ? s.ko : s.def).join(" / ")})`).join("; ");
-  const age = ageOf(ST) || 11; const lv = ST.level ? Math.max(1, Math.round(ST.level.g)) : 2;
-  return `Write a short, fun story for a ${age}-year-old ${KO() ? "Korean " : ""}student learning English (about US grade ${Math.max(1, lv - 1)}-${lv} reading level), split into 4 parts.
+  const age = ageOf(ST) || 11; const lv = ST.level ? Math.max(1, Math.round(ST.level.g)) : 2; const sh = storyShape();
+  return `Write an engaging story for a ${age}-year-old ${KO() ? "Korean " : ""}student learning English (about US grade ${Math.max(1, lv - 1)}-${lv} reading level), split into ${sh.parts} parts.
 Use EVERY one of these target words at least once across the story (normal forms like -s, -ed, -ing are fine): ${list}
-Rules: each part is 45-65 words, simple sentences, friendly and kid-appropriate, one clear plot that continues from part to part, a kid main character (can be Korean). No violence or scary content.
-After each part, write 2 multiple-choice questions in simple English about THAT part only: 1 about what happened, 1 about what a target word used in that part means there. Each has 4 short options and exactly one correct answer.
+Rules: each part is ${sh.words} words, friendly and age-appropriate, one clear plot that continues from part to part, a relatable main character (can be Korean). ${age >= 13 ? "Make it interesting for a teenager (school life, friendship, mystery, sports, science, adventure); vary sentence length." : "Simple, clear sentences."} No violence or scary content.
+After each part, write ${sh.q} multiple-choice questions in simple English about THAT part only: ${sh.kinds}. Each has 4 short options and exactly one correct answer.
 Reply with ONLY JSON, no markdown:
 ${KO() ? `{"title": "...", "parts": [{"en": "...", "ko": "natural Korean translation of the part", "questions": [{"q": "...", "options": ["...","...","...","..."], "answer": 0, "why_ko": "short Korean explanation of the answer"}]}]}` : `{"title": "...", "parts": [{"en": "...", "questions": [{"q": "...", "options": ["...","...","...","..."], "answer": 0, "why_en": "short simple English explanation of the answer"}]}]}`}`;
 }
@@ -1126,7 +1136,11 @@ async function openStory() {
       if (!WW.ask) throw new Error("AI not available");
       const raw = await WW.ask(storyPrompt(wk.newIds)); const m = raw.match(/\{[\s\S]*\}/); data = JSON.parse(m ? m[0] : raw);
       if (!data.parts || !data.parts.length) throw new Error("bad story");
-      data.created = Date.now(); data.words = wk.newIds; await setDoc(storyPath(), data);
+      data.created = Date.now(); data.words = wk.newIds; data.needsAudio = true; await setDoc(storyPath(), data); ST.storyAudioPending = weekKey(); saveST();
+    }
+    if (data && data.prepKey == null && data.parts) {
+      if (data.audio && data.audio.parts) { try { const au = await getAll(storyPath() + "/audio"); STORY.ai = {}; au.forEach(x => STORY.ai[x._id] = x.b64); } catch (e) {} if (ST.storyAudioPending) { delete ST.storyAudioPending; saveST(); } }
+      else if (!data.needsAudio) { data.needsAudio = true; await setDoc(storyPath(), data); ST.storyAudioPending = weekKey(); saveST(); }
     }
     data = normStory(data);
     STORY = Object.assign(STORY, { loading: false, data, total: data.parts.reduce((s, p) => s + (p.questions || []).length, 0) });
@@ -1137,11 +1151,11 @@ function preparedStory(ids) { const set = ids.slice().sort().join("|");
   return (window.__STORIES__ || []).find(s => s.ids.slice().sort().join("|") === set) || null; }
 const STORY_AUDIO = {};
 function loadStoryAudio(key) { if (STORY_AUDIO[key]) return Promise.resolve(); return fetch("audio/story_" + key + ".json").then(r => r.ok ? r.json() : {}).catch(() => ({})).then(j => { STORY_AUDIO[key] = j; }); }
-function storyClip(pi, si) { const d = STORY && STORY.data; if (!d || d.prepKey == null) return null; const a = STORY_AUDIO[d.prepKey] || {}; const b = a[d.prepKey + "_" + pi + "_" + si]; return b ? "data:audio/mpeg;base64," + b : null; }
+function storyClip(pi, si) { const d = STORY && STORY.data; if (d && d.prepKey == null && STORY.ai && si === "all" && STORY.ai[pi]) return "data:audio/mpeg;base64," + STORY.ai[pi]; if (!d || d.prepKey == null) return null; const a = STORY_AUDIO[d.prepKey] || {}; const b = a[d.prepKey + "_" + pi + "_" + si]; return b ? "data:audio/mpeg;base64," + b : null; }
 let paraToken = 0;
 function playClips(list, done) { // list of {src,text}
   const my = ++paraToken; let i = 0;
-  const nextOne = () => { if (my !== paraToken) return; if (i >= list.length) { done && done(); return; } const it = list[i++];
+  const nextOne = () => { if (my !== paraToken) return; if (i >= list.length) { if (STORY && STORY.playing != null) { STORY.playing = null; STORY.paused = false; if (view.name === "story") render(); } done && done(); return; } const it = list[i++];
     if (it.src) { player.onended = () => setTimeout(nextOne, 30); player.src = it.src; player.playbackRate = it.rate || 1; const p = player.play(); if (p) p.catch(() => { say(it.text, 0.9); setTimeout(nextOne, 1500); }); }
     else { if ("speechSynthesis" in window) { const u = new SpeechSynthesisUtterance(it.text); u.lang = "en-US"; if (VOICE) u.voice = VOICE; u.rate = 0.88; u.onend = () => setTimeout(nextOne, 60); speechSynthesis.speak(u); } else nextOne(); } };
   nextOne();
@@ -1156,7 +1170,7 @@ function storyHtmlPara(text, ids) {
 function renderStory() {
   const S = STORY;
   const top = `<div class="topbar"><button class="x" data-act="quit" aria-label="Close">${I.x}</button><span class="count" style="flex:1">Weekly story</span><span style="width:44px;flex:none"></span></div>`;
-  if (S.loading) { $app.innerHTML = top + `<div class="card" style="align-items:center;text-align:center">${buddy("happy", 96)}<h2>Writing this week's story…</h2><p class="muted">It uses all your new words. This takes a few seconds.</p></div>`; return; }
+  if (S.loading) { $app.innerHTML = top + loaderHtml("Writing this week's story… 📖"); return; }
   if (S.error) { $app.innerHTML = top + `<div class="card">${buddy("sad", 80)}<h2>The story couldn't load</h2><p class="muted">${esc(S.error)}</p><button class="big primary" data-act="story">Try again</button></div>`; return; }
   if (S.read) return renderReadAloud();
   if (S.dict) return renderDictation();
@@ -1177,7 +1191,8 @@ function renderStory() {
   }
   const after = S.step === "after";
   $app.innerHTML = top + `<div class="story-hero"><span class="eyebrow" style="color:rgba(255,255,255,.8)">This week's story</span><h1>${esc(d.title)}</h1>${steps}</div>
-    <div class="card story-p"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start"><p class="story-text">${storyHtmlPara(P.en, ids)}</p><button class="round" data-act="readPara" data-i="${S.part}" aria-label="Listen">${ICON_SPK}</button></div>
+    <div class="card story-p"><div class="row between" style="flex-wrap:nowrap;align-items:flex-start"><p class="story-text">${storyHtmlPara(P.en, ids)}</p><button class="round" data-act="readPara" data-i="${S.part}" aria-label="${S.playing === S.part && !S.paused ? "Pause" : "Listen"}" style="${S.playing === S.part ? "background:var(--violet);color:#fff" : ""}">${S.playing === S.part ? (S.paused ? "▶" : "⏸") : ICON_SPK}</button></div>
+      ${d.prepKey == null && d.needsAudio && !S.ai ? `<p class="muted small">🎙️ Bella is recording this story. The natural voice will be ready in about 10–20 minutes.</p>` : ""}
       ${after && (!KO() || !P.ko) ? "" : after ? (S.showKo[S.part] ? `<p class="muted story-ko">${esc(P.ko)}</p><button class="ghost" data-act="toggleKo" data-i="${S.part}" style="align-self:flex-start">Hide Korean</button>` : `<button class="ghost" data-act="toggleKo" data-i="${S.part}" style="align-self:flex-start">Show Korean</button>`) : `<p class="muted small">Tap a highlighted word to hear it and see what it means in English.</p>`}</div>
     ${after ? `<button class="big primary" data-act="storyNextPart">${S.part + 1 < nParts ? "Next part →" : "Finish the story"}</button>`
       : `<button class="big primary" data-act="storyQs">I read it · answer ${P.questions.length} question${P.questions.length === 1 ? "" : "s"}</button>`}`;
@@ -1197,7 +1212,11 @@ function storyAdvance() { const S = STORY; stopAudio(); paraToken++;
   startAttempt("story", { n: S.total, title: S.data.title }); ATT.end = Date.now(); ATT.score = S.total ? S.right / S.total : 1; ATT.answers = S.answers; ATT.dictation = S.dictLog || []; ATT.reading = S.readLog || []; saveAttempt();
   if (!(ST.storyWeeks || []).includes(weekKey())) { ST.storyWeeks = (ST.storyWeeks || []).concat([weekKey()]).slice(-30); bumpStat("stories"); award(30, "story"); }
   logDid("story " + S.right + "/" + S.total); checkBadges(); saveST(); PROG = null; render(); }
-function readPara(i) { const p = STORY.data.parts[i]; if (!p) return; stopAudio(); paraToken++;
+function readPara(i) { const p = STORY.data.parts[i]; if (!p) return;
+  if (STORY.playing === i) { // second tap pauses, third resumes
+    if (!STORY.paused) { STORY.paused = true; try { player.pause(); } catch (e) {} if (window.speechSynthesis) speechSynthesis.pause(); return render(); }
+    STORY.paused = false; if (player.src && player.currentTime > 0 && !player.ended) { player.play().catch(() => {}); } else if (window.speechSynthesis) speechSynthesis.resume(); return render(); }
+  stopAudio(); paraToken++; STORY.playing = i; STORY.paused = false; setTimeout(render, 0);
   const all = storyClip(i, "all"); if (all) return playClips([{ src: all, text: p.en }]);
   playClips(storySents(p).map((s, si) => ({ src: storyClip(i, si), text: s }))); }
 
@@ -1322,6 +1341,19 @@ function renderReadAloud() {
         <p class="muted" style="text-align:center;font-weight:800">${R.listening ? "Listening… read the whole part. Words turn green." : "Tap the mic, then start reading"}</p>
         ${R.listening ? `<button class="big" data-act="readStop">I'm done reading</button>` : `<button class="ghost" data-act="readHear" style="align-self:center">${ICON_SPK} Listen to it first</button>`}`}
     </div>`;
+}
+
+/* write this week's story in the background so Bella can record it before the student opens it */
+async function prepStory() {
+  try { if (!WW.ask || !ST || !ST.week || !readyForWeeks() || IS_OWNER) return; const wk = ST.week, key = weekKey();
+    if (ST.storyPrepped === key || preparedStory(wk.newIds)) return;
+    const snap = await db.doc(storyPath()).get(); if (snap.exists) { ST.storyPrepped = key; return; }
+    const raw = await WW.ask(storyPrompt(wk.newIds)); const m = raw.match(/\{[\s\S]*\}/); const data = JSON.parse(m ? m[0] : raw);
+    if (!data.parts || !data.parts.length) return;
+    const again = await db.doc(storyPath()).get(); if (again.exists) return;
+    data.created = Date.now(); data.words = wk.newIds; data.needsAudio = true; data.pre = true;
+    await setDoc(storyPath(), data); ST.storyPrepped = key; ST.storyAudioPending = key; saveST();
+  } catch (e) { console.warn("prepStory", e); }
 }
 
 /* ---------- level test, profile, goals, language, menu ---------- */
@@ -1555,6 +1587,7 @@ function openMenu() {
     ${ST && !IS_OWNER && !pushOn() && WW.pushPermission() !== "unsupported" ? `<button class="menu-item" data-act="menuPush">🔔 Turn on reminders</button>` : ""}
     ${ST && ["pending", "rejected"].indexOf(studentHome()) < 0 && ST.profile ? `<button class="menu-item" data-act="feedback">💬 Send feedback</button>` : ""}
     ${ST && studentHome() === "tabs" ? `<button class="menu-item" data-act="menuMic">🎤 Sound &amp; microphone</button>` : ""}
+    ${!IS_OWNER && ST && ST.profile ? `<button class="menu-item" data-act="menuParent">👨‍👩‍👧 For parents</button><button class="menu-item" data-act="menuSwitch">👥 Switch or add child</button>` : ""}
     <button class="menu-item" data-act="reload">🔄 Reload app</button>
     ${IS_OWNER ? `<button class="menu-item" data-act="menuSurvey">⭐ Preview parent survey</button>` : ""}
     ${IS_OWNER ? `<button class="menu-item" data-act="toTeacher">📊 Teacher dashboard</button>` : `<button class="menu-item danger" data-act="menuSignout">↩️ Sign out</button>`}</div>`;
@@ -1606,6 +1639,7 @@ async function wipeStudent(sid, keep) {
   const base = "students/" + sid;
   for (const c of ["words", "attempts", "sessions", "stories", "feedback"]) { const s = await db.collection(base + "/" + c).get(); for (const d of s.docs) await db.doc(base + "/" + c + "/" + d.id).delete(); }
   const fresh = Object.assign(newStudent(!!keep.test), { email: keep.email || "", resetAt: Date.now(), resets: (keep.resets || 0) + 1 });
+  ["family", "parentPin", "parent", "betaSeat"].forEach(k => { if (keep[k] != null) fresh[k] = keep[k]; });
   if (keep.approved != null) fresh.approved = keep.approved; if (keep.rejected) fresh.rejected = keep.rejected; if (keep.settings && keep.settings.lang) fresh.settings = { lang: keep.settings.lang };
   await db.doc(base).set(fresh); return fresh;
 }
@@ -1802,6 +1836,255 @@ function renderTestOutResult() { const v = view;
     : `<div class="notice">You need 80% to get new words. Keep training these. You can try again ${(ST.week.testOuts || 0) < 2 ? "once more this week" : "next week"}.</div>`}
   <button class="big primary" data-act="${v.pass ? "train" : "home"}">${v.pass ? "Learn my new words" : "Back home"}</button>`;
 }
+
+/* ---------- moving loader ---------- */
+const LD_MSGS = ["Hang on tight! 🚀", "Almost there…!", "Warming up your words… 🔥", "Just a sec… 🐢", "Getting things ready ✏️"];
+function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInterval(() => { const e = document.getElementById("ldMsg2"); if (!e) return clearInterval(window.__ld2); const i = (LD_MSGS.indexOf(e.textContent) + 1) % LD_MSGS.length; e.style.opacity = 0; setTimeout(() => { e.textContent = LD_MSGS[i]; e.style.opacity = 1; }, 200); }, 1600);
+  return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
+
+/* ---------- "new version" popup ---------- */
+const APP_VER = "b9c1125f10"; let VER_SNOOZE = 0;
+async function checkVersion() {
+  if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
+  try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
+    if (j.v && j.v !== APP_VER) {
+      const el = document.createElement("div"); el.className = "cel"; el.id = "verPop";
+      el.innerHTML = `<div class="cel-card"><div class="cel-icon">✨</div><h2>New version ready!</h2><p class="muted">Vocaboo just got better. Tap to update. It only takes a second.</p><p class="muted small">새 버전이 있어요! 눌러서 업데이트하세요.</p><button class="big primary" data-act="verUpdate" data-v="${esc(j.v)}">Update now</button><button class="ghost" data-act="verLater">Later</button></div>`;
+      document.body.appendChild(el); } } catch (e) {}
+}
+setTimeout(checkVersion, 8000); setInterval(checkVersion, 10 * 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
+
+/* ---------- family profiles (one parent login, several kids) ---------- */
+let FAM = null, FAMPIN = null, PARENT_OK = 0;
+const famKey = () => "vb_sid_" + ME;
+const AV_COLORS = ["#7B61FF", "#FF6B5B", "#1FA98F", "#3F82F2", "#E0A100", "#D946EF"];
+async function startFamily(forcePicker) {
+  const prim = await db.doc("students/" + ME).get(); const P = prim.exists ? prim.data() : null;
+  FAMPIN = (P && P.parentPin) || null;
+  FAM = [{ sid: ME, st: P }];
+  for (const sid of ((P && P.family) || [])) { try { const d = await db.doc("students/" + sid).get(); if (d.exists) FAM.push({ sid, st: d.data() }); } catch (e) {} }
+  let pick = null; try { pick = localStorage.getItem(famKey()); } catch (e) {}
+  if (forcePicker || (FAM.length > 1 && !FAM.some(f => f.sid === pick))) { mode = "student"; view = { name: "who" }; return render(); }
+  SID = pick && FAM.some(f => f.sid === pick) ? pick : ME; return loadStudent(false);
+}
+function renderWho() {
+  const card = (f, i) => { const st = f.st || {}; const nm = (st.profile && st.profile.name) || (i === 0 ? "My first child" : "New child");
+    return `<button class="who-card" data-act="pickKid" data-sid="${esc(f.sid)}"><span class="avatar" style="width:72px;height:72px;font-size:32px;background:${AV_COLORS[i % AV_COLORS.length]}">${esc(nm[0].toUpperCase())}</span><b>${esc(nm)}</b><span class="muted small">${st.rejected ? "Not approved" : st.approved === false && st.profile ? "Waiting for approval" : st.level ? esc(gradeWord(st.level.g)) : st.profile ? "Level test next" : "Not set up yet"}</span></button>`; };
+  $app.innerHTML = `<section class="hero" style="text-align:center;padding-bottom:70px"><div class="stack" style="align-items:center;gap:8px;padding-top:20px">${buddy("happy", 90)}<h1>Who's learning today?</h1><p class="muted">누가 공부할까요?</p></div></section>
+    <div class="who-grid" style="margin-top:-48px;position:relative">${(FAM || []).map(card).join("")}${(FAM || []).length < 6 ? `<button class="who-card add" data-act="addKid"><span class="avatar" style="width:72px;height:72px;font-size:34px;background:var(--violet-soft);color:var(--violet)">+</span><b>Add a child</b><span class="muted small">아이 추가</span></button>` : ""}</div>
+    <p class="muted small" style="text-align:center">Each child has their own words, level, streak and progress.</p>
+    <button class="ghost" data-act="whoSignout" style="align-self:center">Sign out</button>`;
+}
+async function pickKid(sid) {
+  try { localStorage.setItem(famKey(), sid); } catch (e) {}
+  leaveActivity(); clearInterval(hbTimer); SESSION = null; WORDS = {}; PROG = null; TAB = "today"; tourAsked = false; PARENT_OK = 0;
+  $app.innerHTML = loaderHtml("Getting ready… 🎒"); SID = sid; await loadStudent(false);
+}
+async function addKid() {
+  const prim = await db.doc("students/" + ME).get(); const P = prim.exists ? clone(prim.data()) : null;
+  if (!P) return pickKid(ME); // the first child uses the main profile
+  const fam = P.family || []; let n = 2; while (fam.includes(ME + "_k" + n)) n++;
+  const sid = ME + "_k" + n; P.family = fam.concat([sid]); await db.doc("students/" + ME).set(P);
+  return pickKid(sid);
+}
+function switchKid() { leaveActivity(); closeMenu(); $app.innerHTML = loaderHtml("Opening profiles… 👨‍👩‍👧"); startFamily(true); }
+
+/* ---------- parent corner (PIN) ---------- */
+async function pinHash(pin) { const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("vocaboo|" + ME + "|" + pin)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+function parentUnlocked() { return PARENT_OK && Date.now() - PARENT_OK < 10 * 60000; }
+let PIN_FLOW = null; // {mode:'set'|'confirm'|'enter'|'forgot', first, entry, err, then}
+function openParent(then) { PIN_FLOW = { mode: FAMPIN ? "enter" : "set", entry: "", then: then || "parent" }; if (FAMPIN && parentUnlocked()) return pinDone(); drawPin(); }
+function drawPin() {
+  const old = document.getElementById("pinPad"); if (old) old.remove(); if (!PIN_FLOW) return;
+  const F = PIN_FLOW; const title = F.mode === "set" ? "Create a parent PIN" : F.mode === "confirm" ? "Type the PIN again" : F.mode === "forgot" ? "Forgot your PIN?" : "Parents only";
+  const sub = F.mode === "set" ? "4 numbers your child doesn't know. 아이가 모르는 4자리 숫자" : F.mode === "confirm" ? "" : F.mode === "forgot" ? "Type your Vocaboo account password to make a new PIN." : "Enter your 4-digit PIN · 부모님 비밀번호";
+  const el = document.createElement("div"); el.className = "cel"; el.id = "pinPad";
+  el.innerHTML = `<div class="cel-card" style="gap:12px"><div class="cel-icon">👨‍👩‍👧</div><h2 style="margin:0">${title}</h2>${sub ? `<p class="muted small" style="margin:0">${sub}</p>` : ""}
+    ${F.mode === "forgot" ? `<input id="pinPw" type="password" autocomplete="current-password" placeholder="Account password" style="min-height:52px;width:100%;border-radius:16px;border:2px solid var(--line);padding:0 14px;font:inherit;font-size:18px"><button class="big primary" data-act="pinForgotGo">Continue</button>`
+      : `<div class="pin-dots">${[0, 1, 2, 3].map(i => `<i class="${i < F.entry.length ? "on" : ""}"></i>`).join("")}</div>
+      <div class="pin-keys">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "", 0, "⌫"].map(k => k === "" ? "<span></span>" : `<button data-act="pinKey" data-k="${k}">${k}</button>`).join("")}</div>`}
+    ${F.err ? `<div class="fb bad" style="width:100%">${esc(F.err)}</div>` : ""}
+    <div class="row" style="justify-content:center">${F.mode === "enter" ? `<button class="ghost" data-act="pinForgot">Forgot PIN?</button>` : ""}<button class="ghost" data-act="pinClose">Cancel</button></div></div>`;
+  document.body.appendChild(el);
+}
+async function pinKey(k) { const F = PIN_FLOW; if (!F) return; F.err = "";
+  if (k === "⌫") F.entry = F.entry.slice(0, -1); else if (F.entry.length < 4) F.entry += k;
+  if (F.entry.length < 4) return drawPin();
+  if (F.mode === "set") { F.first = F.entry; F.entry = ""; F.mode = "confirm"; return drawPin(); }
+  if (F.mode === "confirm") { if (F.entry !== F.first) { F.mode = "set"; F.entry = ""; F.err = "The PINs didn't match. Try again."; return drawPin(); }
+    FAMPIN = await pinHash(F.entry); const prim = await db.doc("students/" + ME).get(); if (prim.exists) { const P = clone(prim.data()); P.parentPin = FAMPIN; await db.doc("students/" + ME).set(P); if (SID === ME) ST.parentPin = FAMPIN; }
+    toast("Parent PIN saved 🔒"); return pinDone(); }
+  if (F.mode === "enter") { if ((await pinHash(F.entry)) === FAMPIN) return pinDone(); F.entry = ""; F.err = "Wrong PIN. Try again."; return drawPin(); }
+}
+async function pinForgotGo() { const pw = (document.getElementById("pinPw") || {}).value || ""; if (!pw) return;
+  try { await WW.reauth(pw); PIN_FLOW = { mode: "set", entry: "", then: PIN_FLOW.then }; drawPin(); }
+  catch (e) { PIN_FLOW.err = "That password isn't right."; drawPin(); } }
+function pinDone() { PARENT_OK = Date.now(); const then = PIN_FLOW && PIN_FLOW.then; PIN_FLOW = null; const el = document.getElementById("pinPad"); if (el) el.remove();
+  if (then === "signout") { WW.signOut().then(() => location.reload()); return; }
+  leaveActivity(); view = { name: "parent" }; PROG = null; window.scrollTo(0, 0); render(); }
+function renderParent() {
+  if (!parentUnlocked()) { view = { name: "tabs" }; TAB = "me"; return render(); }
+  if (!PROG) { $app.innerHTML = loaderHtml("Loading the parent report… 📊"); loadProgress().then(() => view.name === "parent" && render()).catch(() => { PROG = { atts: [], sess: [] }; render(); }); return; }
+  const wk = weekKey(); const sess = PROG.sess.filter(s => s.weekKey === wk); const mins = Math.round(sess.reduce((t, s) => t + actSec(s), 0) / 60);
+  const days = new Set(sess.map(s => s.day)).size; const qz = PROG.atts.filter(a => a.kind === "quiz" && a.end && a.weekKey === wk); const avg = qz.length ? Math.round(qz.reduce((t, a) => t + a.score, 0) / qz.length * 100) : null;
+  const ids = weekIds(); const mastered = ids.filter(isMastered).length; const learned = Object.keys(WORDS).length; const totalMastered = Object.keys(WORDS).filter(isMastered).length;
+  const miss = {}; PROG.atts.filter(a => a.weekKey === wk && ["quiz", "training", "boss", "testout"].includes(a.kind)).flatMap(a => a.items || []).filter(i => !i.ok && BY[i.id] && !SPEAK.has(i.t)).forEach(i => miss[i.id] = (miss[i.id] || 0) + 1);
+  const tricky = Object.entries(miss).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const L = ST.level; const g0 = ST.goal ? ST.goal.from : L ? L.g : 0; const goalPct = ST.goal && L ? Math.max(0, Math.min(100, (L.g - g0) / Math.max(0.1, ST.goal.g - g0) * 100)) : 0;
+  const times = (ST.push && ST.push.times) || [8, 17, 20];
+  const hourSel = (i) => `<select data-change="remTime" data-i="${i}" style="min-height:46px;border-radius:14px;border:2px solid var(--line);padding:0 10px;font:inherit;font-size:16px;background:#fff"><option value="">Off</option>${Array.from({ length: 17 }, (_, k) => k + 6).map(h => `<option value="${h}" ${times[i] === h ? "selected" : ""}>${h < 12 ? h + ":00 am" : h === 12 ? "12:00 pm" : (h - 12) + ":00 pm"}</option>`).join("")}</select>`;
+  $app.innerHTML = `<div class="topbar"><button class="x" data-act="parentClose" aria-label="Back">${I.back}</button><span class="count" style="flex:1">For parents · 부모님</span><span style="width:44px;flex:none"></span></div>
+   <section class="hero" style="padding:18px 20px"><div class="row" style="gap:12px"><span class="avatar big">${esc((firstName() || "?")[0].toUpperCase())}</span><div class="stack" style="gap:2px"><h1 style="margin:0;font-size:26px">${esc(firstName())}'s week</h1><span class="muted">${L ? esc(gradeWord(L.g)) : ""}${ageOf(ST) != null ? " · age " + ageOf(ST) : ""}</span></div></div></section>
+   <div class="tiles"><div class="tile"><b>${mins}</b><span>minutes this week</span></div><div class="tile"><b>${days}/7</b><span>days studied</span></div><div class="tile"><b>${qz.length}</b><span>quizzes${avg != null ? " · avg " + avg + "%" : ""}</span></div></div>
+   <div class="tiles"><div class="tile"><b>${streakNow()}🔥</b><span>day streak${ST.freezes ? " · ❄️" + ST.freezes : ""}</span></div><div class="tile"><b>${mastered}/${ids.length}</b><span>this week's words mastered</span></div><div class="tile"><b>${totalMastered}</b><span>words mastered total (${learned} studied)</span></div></div>
+   ${L ? `<div class="card"><div class="row between"><h3>Word level</h3><span class="pill sun">${esc(gradeWord(L.g))}</span></div>${ST.goal ? `<div class="stack" style="gap:5px"><div class="row between small"><span class="muted">Goal: ${esc(gradeWord(ST.goal.g))} by ${ST.goal.by}</span><b>${Math.round(goalPct)}%</b></div><div class="hbar"><i style="width:${goalPct}%;background:#FFC93C"></i></div></div>` : ""}</div>` : ""}
+   <div class="card"><h3>Needs more practice</h3>${tricky.length ? `<div class="chips">${tricky.map(([id, n]) => `<span class="chip">${esc(BY[id].w)} · ${esc(gloss(BY[id]))} <b>×${n}</b></span>`).join("")}</div>` : `<p class="muted">No misses this week. 👏</p>`}</div>
+   <div class="card"><h3>Reminder times 🔔</h3><p class="muted small">Choose up to 3 times a day. ${pushOn() ? "" : "Reminders are off on this phone. Turn them on below."}</p><div class="row" style="gap:8px">${hourSel(0)}${hourSel(1)}${hourSel(2)}</div>${pushOn() ? "" : `<button class="big primary" data-act="pushOn">Turn on reminders</button>`}</div>
+   ${planCard()}
+   <div class="card"><h3>Word meanings</h3><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">English + 한국어</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
+   <div class="card"><h3>Parent PIN</h3><div class="row"><button data-act="pinChange">Change PIN</button></div></div>
+   ${resetCard()}
+   <button class="big" data-act="switchKid">👥 Switch or add child</button>
+   <button class="big" data-act="signoutNow">Sign out</button>`;
+}
+function saveRemTime(i, v) { const t = ((ST.push && ST.push.times) || [8, 17, 20]).slice(); while (t.length < 3) t.push(null); t[i] = v === "" ? null : +v;
+  const clean = [...new Set(t.filter(x => x != null))].sort((a, b) => a - b);
+  ST.push = Object.assign({}, ST.push || {}, { times: clean, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }); saveST(); toast(clean.length ? "Reminders at " + clean.map(h => (h > 12 ? h - 12 : h) + (h < 12 ? "am" : "pm")).join(", ") : "Reminders off"); render(); }
+
+/* ---------- streak freeze ---------- */
+// earn 1 freeze for every 5 quizzes finished (hold up to 2). A freeze covers one missed day.
+function streakAlive(s, d) { if (!s || !s.last) return false; const gap = Math.round((new Date(d + "T12:00:00") - new Date(s.last + "T12:00:00")) / 864e5); return gap <= 1 + (ST.freezes || 0); }
+function streakUpdate(d) { const s = ST.streak || { count: 0, best: 0, last: "" };
+  if (s.last === d) return s;
+  const gap = s.last ? Math.round((new Date(d + "T12:00:00") - new Date(s.last + "T12:00:00")) / 864e5) : 99;
+  if (gap === 1) s.count = (s.count || 0) + 1;
+  else if (gap > 1 && gap - 1 <= (ST.freezes || 0)) { ST.freezes -= gap - 1; ST.freezeUsed = (ST.freezeUsed || 0) + gap - 1; s.count = (s.count || 0) + 1; setTimeout(() => toast("❄️ A streak freeze saved your streak!"), 1200); }
+  else s.count = 1;
+  s.last = d; s.best = Math.max(s.best || 0, s.count);
+  ST.quizzesDone = (ST.quizzesDone || 0) + 1; if (ST.quizzesDone % 5 === 0 && (ST.freezes || 0) < 2) { ST.freezes = (ST.freezes || 0) + 1; setTimeout(() => toast("❄️ You earned a streak freeze!"), 2600); }
+  return s; }
+
+/* ---------- bigger text ---------- */
+function applyTextSize() { const z = (ST && ST.settings && ST.settings.text) || "m"; document.body.classList.toggle("txt-l", z === "l"); document.body.classList.toggle("txt-xl", z === "xl"); }
+function textCard() { const z = (ST.settings && ST.settings.text) || "m";
+  return `<div class="card"><h3>Text size</h3><div class="seg" style="width:100%"><button data-act="setText" data-v="m" aria-pressed="${z === "m"}" style="flex:1">A</button><button data-act="setText" data-v="l" aria-pressed="${z === "l"}" style="flex:1;font-size:18px">A</button><button data-act="setText" data-v="xl" aria-pressed="${z === "xl"}" style="flex:1;font-size:22px">A</button></div></div>`; }
+
+/* ---------- world map: one island per week, boss island every 4 weeks ---------- */
+const WORLDS = [
+  { name: "Crystal Peaks", ko: "크리스탈 봉우리", bg: ["#1E2A6E", "#4B2C91"], top: "#E6F4FF", side: "#8EC5FF", side2: "#5C9EE8", deco: "crystal" },
+  { name: "Jungle Jumble", ko: "정글 대모험", bg: ["#0D3B2E", "#178A6E"], top: "#B5E48C", side: "#8B5E34", side2: "#6B4423", deco: "tree" },
+  { name: "Sunny Dunes", ko: "햇살 사막", bg: ["#9A3412", "#F59E0B"], top: "#FDE68A", side: "#D97706", side2: "#B45309", deco: "cactus" },
+  { name: "Star Galaxy", ko: "별빛 은하", bg: ["#0B1026", "#4C1D95"], top: "#DDD6FE", side: "#7C3AED", side2: "#5B21B6", deco: "planet" }
+];
+const PER_WORLD = 12;
+function mapWeeks() { const ks = new Set(((ST.history || []).map(h => h.key)).concat(ST.week ? [ST.week.key] : [])); return [...ks].sort(); }
+function weekWords(key) { if (ST.week && ST.week.key === key) return ST.week.newIds.concat(ST.week.reviewIds); const h = (ST.history || []).filter(x => x.key === key).pop(); return h ? h.newIds.concat(h.reviewIds || []) : []; }
+function starsFor(key) {
+  const cur = ST.week && ST.week.key === key; const saved = (ST.weekStars || {})[key] || 0;
+  const qd = (ST.quizDays || []).filter(d => d >= key && d <= addDays(key, 6)).length; const story = (ST.storyWeeks || []).includes(key);
+  let s = 0; if ((cur && ST.week.introDone) || (!cur && qd > 0)) s = 1; if (s >= 1 && qd >= 4) s = 2; if (s >= 2 && story) s = 3;
+  return Math.max(saved, s);
+}
+function saveStars() { const k = ST.week && ST.week.key; if (!k) return; const s = starsFor(k); ST.weekStars = ST.weekStars || {}; if ((ST.weekStars[k] || 0) < s) { ST.weekStars[k] = s; saveST(); if (s === 3) setTimeout(() => toast("⭐⭐⭐ Island complete!"), 400); } }
+function bossReady(b, weeks) { const last = 4 * b + 3; return weeks.length > last && starsFor(weeks[last]) >= 1; }
+
+function islandSvg(x, y, th, state, r) { // state: done | current | locked
+  r = r || 46; const lock = state === "locked"; const top = lock ? "#C9C5D9" : th.top, side = lock ? "#8F8AA8" : th.side, side2 = lock ? "#7A7594" : th.side2;
+  let deco = "";
+  if (!lock) {
+    if (th.deco === "crystal") deco = `<path d="M${x - 22} ${y - 6}l6 -22 6 22z" fill="#9AD0FF"/><path d="M${x - 14} ${y - 4}l4 -14 4 14z" fill="#C7E6FF"/><path d="M${x + 16} ${y - 5}l5 -18 5 18z" fill="#9AD0FF"/>`;
+    if (th.deco === "tree") deco = `<rect x="${x - 21}" y="${y - 20}" width="4" height="14" fill="#6B4423"/><circle cx="${x - 19}" cy="${y - 24}" r="10" fill="#2D9D5C"/><rect x="${x + 17}" y="${y - 16}" width="4" height="11" fill="#6B4423"/><circle cx="${x + 19}" cy="${y - 20}" r="8" fill="#38B26C"/>`;
+    if (th.deco === "cactus") deco = `<rect x="${x - 22}" y="${y - 26}" width="7" height="20" rx="3.5" fill="#3F9E4D"/><rect x="${x - 28}" y="${y - 20}" width="5" height="9" rx="2.5" fill="#3F9E4D"/><rect x="${x + 16}" y="${y - 18}" width="6" height="13" rx="3" fill="#3F9E4D"/>`;
+    if (th.deco === "planet") deco = `<circle cx="${x - 20}" cy="${y - 16}" r="8" fill="#F472B6"/><ellipse cx="${x - 20}" cy="${y - 16}" rx="13" ry="3.5" fill="none" stroke="#FBCFE8" stroke-width="2"/><path d="M${x + 18} ${y - 22}l2 5 5 1 -4 3 1 5 -4 -3 -4 3 1 -5 -4 -3 5 -1z" fill="#FDE047"/>`;
+  }
+  return `<g${lock ? ' opacity=".75"' : ""}><path d="M${x - r} ${y} Q${x - r * 0.8} ${y + r * 0.95} ${x} ${y + r * 1.15} Q${x + r * 0.8} ${y + r * 0.95} ${x + r} ${y} Z" fill="${side}"/><path d="M${x} ${y} L${x + r} ${y} Q${x + r * 0.8} ${y + r * 0.95} ${x} ${y + r * 1.15} Z" fill="${side2}" opacity=".55"/>
+    <ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r * 0.42}" fill="${top}"/><ellipse cx="${x}" cy="${y + 2}" rx="${r * 0.55}" ry="${r * 0.2}" fill="rgba(0,0,0,.07)"/>${deco}</g>`;
+}
+function starRow(x, y, n) { return [0, 1, 2].map(k => { const cx = x + (k - 1) * 22, cy = y - (k === 1 ? 6 : 0); return `<g transform="translate(${cx} ${cy})"><circle r="10" fill="${k < n ? "#FFC93C" : "rgba(255,255,255,.25)"}" stroke="${k < n ? "#E0A100" : "rgba(255,255,255,.35)"}" stroke-width="2"/><path d="M0 -5.5l1.6 3.4 3.7.4-2.8 2.5.8 3.6L0 2.6l-3.3 1.8.8-3.6-2.8-2.5 3.7-.4z" fill="${k < n ? "#B45309" : "rgba(255,255,255,.5)"}"/></g>`; }).join(""); }
+function renderMap() {
+  saveStars();
+  const weeks = mapWeeks(); const curIdx = weeks.length - 1;
+  // nodes: weeks + boss after every 4, plus 2 upcoming locked islands
+  const nodes = []; const total = weeks.length + 2;
+  for (let i = 0; i < total; i++) { nodes.push({ kind: "week", i }); if ((i + 1) % 4 === 0) nodes.push({ kind: "boss", b: (i + 1) / 4 - 1 }); }
+  const worldOf = n => Math.floor((n.kind === "week" ? n.i : n.b * 4 + 3) / PER_WORLD);
+  const W = 360; const gaps = nodes.map(n => n.kind === "boss" ? 205 : 170); const H = gaps.reduce((a, b) => a + b, 0) + 170;
+  let yy = H - 140; const pos = nodes.map((n, k) => { if (k) yy -= (n.kind === "boss" || nodes[k - 1].kind === "boss") ? 200 : 168; return { x: W / 2 + Math.sin(k * 1.15) * 100, y: yy }; });
+  let path = "", bg = "", art = "";
+  // backgrounds per world band
+  let worldStartY = H; for (let k = 0; k < nodes.length; k++) { const w = worldOf(nodes[k]); const nextW = k + 1 < nodes.length ? worldOf(nodes[k + 1]) : -1;
+    if (nextW !== w) { const th = WORLDS[w % WORLDS.length]; const yTop = k + 1 < nodes.length ? (pos[k].y + pos[k + 1].y) / 2 : 0;
+      bg = `<rect x="0" y="${yTop}" width="${W}" height="${worldStartY - yTop}" fill="url(#wg${w % WORLDS.length})"/><text x="18" y="${worldStartY - 18}" font-size="13" font-weight="900" fill="rgba(255,255,255,.75)" font-family="Nunito,sans-serif">WORLD ${w + 1} · ${th.name.toUpperCase()}</text>` + bg; worldStartY = yTop; } }
+  // clouds / sparkles
+  for (let c = 0; c < nodes.length; c++) { const cy = pos[c].y - 85; const cx = (c * 97) % (W - 60) + 20; art += `<g opacity=".35"><ellipse cx="${cx}" cy="${cy}" rx="26" ry="9" fill="#fff"/><ellipse cx="${cx + 14}" cy="${cy - 6}" rx="14" ry="9" fill="#fff"/></g><circle cx="${(cx + 180) % W}" cy="${cy + 40}" r="2" fill="#fff" opacity=".6"/>`; }
+  // stepping stones
+  for (let k = 0; k + 1 < nodes.length; k++) { const a = pos[k], b = pos[k + 1]; const locked = nodeState(nodes[k + 1]) === "locked";
+    for (let s = 1; s <= 3; s++) { const t = s / 4; path += `<ellipse cx="${a.x + (b.x - a.x) * t}" cy="${a.y - 10 + (b.y - a.y) * t}" rx="9" ry="4" fill="${locked ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.75)"}"/>`; } }
+  function nodeState(n) { if (n.kind === "week") return n.i < curIdx ? "done" : n.i === curIdx ? "current" : "locked"; const c = (ST.bosses || {})[n.b]; return c ? "done" : bossReady(n.b, weeks) ? "current" : "locked"; }
+  let isl = "";
+  nodes.forEach((n, k) => { const p = pos[k]; const th = WORLDS[worldOf(n) % WORLDS.length]; const st = nodeState(n);
+    if (n.kind === "week") {
+      const s = st === "locked" ? 0 : starsFor(weeks[n.i]);
+      isl += `<g class="isle" data-act="isle" data-i="${n.i}" style="cursor:pointer">${st === "current" ? `<ellipse cx="${p.x}" cy="${p.y}" rx="62" ry="28" fill="none" stroke="#FFC93C" stroke-width="4" class="isle-pulse"/>` : ""}${islandSvg(p.x, p.y, th, st)}
+        ${st === "locked" ? `<text x="${p.x}" y="${p.y + 8}" text-anchor="middle" font-size="22">🔒</text>` : starRow(p.x, p.y - (st === "current" ? 78 : 50), s)}
+        <rect x="${p.x - 34}" y="${p.y + 52}" width="68" height="22" rx="11" fill="rgba(0,0,0,.35)"/><text x="${p.x}" y="${p.y + 67}" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Nunito,sans-serif">Week ${n.i + 1}</text>
+        ${st === "current" ? `<g transform="translate(${p.x - 19} ${p.y - 46}) scale(.4)">${buddy("happy", 96).replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>` : ""}</g>`;
+    } else {
+      const c = (ST.bosses || {})[n.b] || 0;
+      isl += `<g class="isle" data-act="boss" data-b="${n.b}" style="cursor:pointer">${st === "current" ? `<ellipse cx="${p.x}" cy="${p.y}" rx="72" ry="32" fill="none" stroke="#FF6B5B" stroke-width="4" class="isle-pulse"/>` : ""}${islandSvg(p.x, p.y, th, st === "locked" ? "locked" : "done", 58)}
+        <g transform="translate(${p.x} ${p.y - 18})"><rect x="-18" y="-26" width="36" height="28" fill="${st === "locked" ? "#8F8AA8" : "#FF6B5B"}"/><path d="M-22 -26h44l-6 -10h-6l-3 6h-4l-3 -6h-4l-3 6h-4l-3 -6h-6z" fill="${st === "locked" ? "#7A7594" : "#E04F3F"}"/><rect x="-6" y="-12" width="12" height="14" rx="6" fill="rgba(0,0,0,.35)"/></g>
+        ${c ? starRow(p.x, p.y - 86, c) : `<text x="${p.x}" y="${p.y - 56}" text-anchor="middle" font-size="22">${st === "locked" ? "🔒" : "👑"}</text>`}
+        <rect x="${p.x - 44}" y="${p.y + 62}" width="88" height="22" rx="11" fill="rgba(0,0,0,.4)"/><text x="${p.x}" y="${p.y + 77}" text-anchor="middle" font-size="12" font-weight="900" fill="#fff" font-family="Nunito,sans-serif">Boss review</text></g>`;
+    } });
+  const defs = WORLDS.map((t, k) => `<linearGradient id="wg${k}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${t.bg[1]}"/><stop offset="1" stop-color="${t.bg[0]}"/></linearGradient>`).join("");
+  const totalStars = weeks.reduce((t, k) => t + starsFor(k), 0) + Object.values(ST.bosses || {}).reduce((a, b) => a + b, 0);
+  $app.innerHTML = `${previewBar()}<div class="row between" style="padding-top:18px;padding-right:52px"><div class="stack" style="gap:2px"><h1 style="margin:0">World map</h1><span class="muted small">${esc(WORLDS[Math.floor(curIdx / PER_WORLD) % WORLDS.length].name)} · ${esc(WORLDS[Math.floor(curIdx / PER_WORLD) % WORLDS.length].ko)}</span></div><span class="pill sun" style="font-size:15px">⭐ ${totalStars}</span></div>
+    <div class="map-wrap" id="mapWrap"><svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block"><defs>${defs}</defs>${bg}${art}${path}${isl}</svg></div>
+    <div class="card"><h3>How to earn stars</h3><p class="small" style="margin:0">⭐ Learn the week's words &nbsp; ⭐⭐ Daily quiz on 4+ days &nbsp; ⭐⭐⭐ Also finish the weekly story</p><p class="muted small" style="margin:0">Every 4 islands, beat the 👑 boss review to show you still remember older words. A new island opens every Saturday.</p></div>`;
+  const cur = document.querySelector(`[data-act="isle"][data-i="${curIdx}"]`); if (cur && !renderMap._scrolled) { renderMap._scrolled = true; setTimeout(() => cur.scrollIntoView({ block: "center" }), 60); }
+}
+function isleSheet(i) {
+  const weeks = mapWeeks(); const key = weeks[i]; const cur = i === weeks.length - 1;
+  let html;
+  if (!key) html = `<div class="cel-icon">🔒</div><h2>Week ${i + 1}</h2><p class="muted">This island opens on Saturday, ${new Date(addDays(weekKey(), 7 * (i - weeks.length + 1)) + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}. Finish this week's island first!</p>`;
+  else { const s = starsFor(key); const ids = weekWords(key); const qd = (ST.quizDays || []).filter(d => d >= key && d <= addDays(key, 6)).length;
+    html = `<div class="cel-icon">${["🏝️", "⭐", "⭐⭐", "🌟"][s]}</div><h2 style="margin:0">Week ${i + 1}</h2><p class="muted small" style="margin:0">${wkShort(key)} – ${wkShort(addDays(key, 6))}</p>
+      <div class="stack" style="gap:6px;text-align:left;width:100%"><span>${s >= 1 ? "✅" : "⬜"} Learn the week's words</span><span>${s >= 2 ? "✅" : "⬜"} Daily quiz on 4+ days <span class="muted small">(${qd} so far)</span></span><span>${s >= 3 ? "✅" : "⬜"} Finish the weekly story</span></div>
+      ${ids.length ? `<div class="chips" style="justify-content:center">${ids.slice(0, 12).map(id => `<span class="chip">${esc(BY[id] ? BY[id].w : id)}</span>`).join("")}${ids.length > 12 ? `<span class="chip">+${ids.length - 12}</span>` : ""}</div>` : ""}
+      ${cur ? `<button class="big primary" data-act="sheetGo" data-go="home">Go to today's plan</button>` : `<button class="big primary" data-act="sheetGo" data-go="practice" data-i="${i}">Practice these words</button>`}`; }
+  sheet(html);
+}
+function bossSheet(b) { const weeks = mapWeeks(); const ready = bossReady(b, weeks); const c = (ST.bosses || {})[b] || 0;
+  sheet(`<div class="cel-icon">👑</div><h2 style="margin:0">Boss review ${b + 1}</h2>
+    <p class="muted">${ready ? `A 20-question challenge with words from weeks ${4 * b + 1}–${4 * b + 4}. Get 80% to win. 90% = ⭐⭐, 95% = ⭐⭐⭐.` : `Opens when you reach week ${4 * b + 4} and earn at least one star there.`}</p>
+    ${c ? `<p>Best: ${"⭐".repeat(c)}</p>` : ""}${ready ? `<button class="big primary" data-act="bossGo" data-b="${b}">${c ? "Try again" : "Fight the boss!"}</button>` : ""}`); }
+function sheet(inner) { const old = document.getElementById("mapSheet"); if (old) old.remove(); const el = document.createElement("div"); el.className = "cel"; el.id = "mapSheet";
+  el.innerHTML = `<div class="cel-card" style="gap:10px">${inner}<button class="ghost" data-act="sheetClose">Close</button></div>`; el.addEventListener("click", e => { if (e.target === el) el.remove(); }); document.body.appendChild(el); }
+function closeSheet() { const el = document.getElementById("mapSheet"); if (el) el.remove(); }
+async function startBoss(b) {
+  closeSheet(); const weeks = mapWeeks(); let pool = []; for (let w = 4 * b; w <= 4 * b + 3; w++) pool = pool.concat(weekWords(weeks[w] || ""));
+  pool = shuffle([...new Set(pool)].filter(id => BY[id])).slice(0, 20); if (pool.length < 5) { toast("Not enough words yet"); return; }
+  const types = KO() ? ["mc_ko", "ko_en", "hear_ko", "blank_mc", "dict", "ctx_ko", "def_en", "blank_ty"] : ["mc_def", "def_en", "hear_ko", "blank_mc", "dict", "ctx_ko", "blank_ty"];
+  const qs = pool.map((id, i) => makeQ2(id, types[i % types.length], pool));
+  RUN = { kind: "boss", boss: b, qs, i: 0, t0: Date.now(), answered: false, right: 0 };
+  startAttempt("boss", { n: qs.length, boss: b }); logDid("boss " + (b + 1));
+  view = { name: "run" }; render(); await loadPacksFor(pool); RUN && (RUN.t0 = Date.now()); autoSpeak();
+}
+function finishBoss() {
+  const n = RUN.qs.length, pct = Math.round(RUN.right / n * 100), b = RUN.boss; const stars = pct >= 95 ? 3 : pct >= 90 ? 2 : pct >= 80 ? 1 : 0;
+  ATT.end = Date.now(); ATT.score = RUN.right / n; ATT.stars = stars; saveAttempt();
+  ST.bosses = ST.bosses || {}; const was = ST.bosses[b] || 0; if (stars > was) ST.bosses[b] = stars;
+  if (stars) { award(stars * 25, "boss"); bumpStat("bosses"); }
+  saveST(); PROG = null;
+  const missed = [...new Set(ATT.items.filter(i => !i.ok).map(i => i.id))];
+  view = { name: "bossResult", pct, stars, b, missed }; RUN = null; render();
+}
+function renderBossResult() { const v = view;
+  $app.innerHTML = `<div style="height:14px"></div><div class="result-hero ${v.stars ? "" : "bad"}">${buddy(v.stars ? "wow" : "sad", 96)}<h1>${v.stars ? "Boss defeated! 👑" : "So close!"}</h1>
+    <p style="font-size:30px;margin:0">${v.stars ? "⭐".repeat(v.stars) : ""}</p><p style="opacity:.9">${v.pct}% correct${v.stars ? "" : " · you need 80% to win"}</p></div>
+    ${v.missed.length ? `<div class="card"><h3>Words to practice</h3><div class="chips">${v.missed.map(id => `<span class="chip">${esc(BY[id].w)} · ${esc(gloss(BY[id]))}</span>`).join("")}</div><button class="big" data-act="bossPractice">Practice these words</button></div>` : ""}
+    <button class="big primary" data-act="toMap">Back to the map</button>`; }
 let T = { students: [], sel: null, data: null, tab: "week", week: null, names: {}, view: "list", q: "", sort: "name" };
 async function loadTeacher() {
   const list = await getAll("students");
@@ -2087,11 +2370,35 @@ document.addEventListener("click", async ev => {
   if (a === "menuHome") { closeMenu(); leaveActivity(); TAB = "today"; view = { name: studentHome() }; window.scrollTo(0, 0); return render(); }
   if (a === "menuMe") { closeMenu(); leaveActivity(); TAB = "me"; view = { name: studentHome() }; window.scrollTo(0, 0); return render(); }
   if (a === "menuPush") { closeMenu(); return turnOnPush(); }
+  if (a === "menuSignout" && FAMPIN && !parentUnlocked()) { closeMenu(); return openParent("signout"); }
   if (a === "menuSignout") { if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to sign out"; return; } closeMenu(); leaveActivity(); await WW.signOut(); return location.reload(); }
   if (a === "pushAskYes") { closePushAsk(); return turnOnPush(); }
   if (a === "pushAskNo") return closePushAsk();
-  if (a === "checkApproved") return checkApproved();
+  if (a === "checkApproved") { $app.innerHTML = loaderHtml("Checking… ⏳"); return checkApproved(); }
   if (a === "micTest") return micTest();
+  if (a === "pickKid") return pickKid(b.dataset.sid);
+  if (a === "isle") return isleSheet(+b.dataset.i);
+  if (a === "boss") return bossSheet(+b.dataset.b);
+  if (a === "sheetClose") return closeSheet();
+  if (a === "bossGo") return startBoss(+b.dataset.b);
+  if (a === "toMap") { TAB = "map"; view = { name: "tabs" }; return render(); }
+  if (a === "bossPractice") { const ids = (view.missed || []).slice(0, 10); return startTraining(ids, "free"); }
+  if (a === "sheetGo") { closeSheet(); if (b.dataset.go === "home") { TAB = "today"; view = { name: "tabs" }; window.scrollTo(0, 0); return render(); }
+    const ids = shuffle(weekWords(mapWeeks()[+b.dataset.i]).filter(id => BY[id])).slice(0, 10); return startTraining(ids, "free"); }
+  if (a === "addKid") return addKid();
+  if (a === "whoSignout") { if (FAMPIN && !parentUnlocked()) return openParent("signout"); await WW.signOut(); return location.reload(); }
+  if (a === "switchKid" || a === "menuSwitch") return switchKid();
+  if (a === "menuParent" || a === "openParent") { closeMenu(); return openParent("parent"); }
+  if (a === "pinKey") return pinKey(b.dataset.k);
+  if (a === "pinClose") { PIN_FLOW = null; const el = document.getElementById("pinPad"); if (el) el.remove(); return; }
+  if (a === "pinForgot") { PIN_FLOW.mode = "forgot"; PIN_FLOW.err = ""; return drawPin(); }
+  if (a === "pinForgotGo") return pinForgotGo();
+  if (a === "pinChange") { PIN_FLOW = { mode: "set", entry: "", then: "parent" }; return drawPin(); }
+  if (a === "parentClose") { PARENT_OK = 0; TAB = "me"; view = { name: "tabs" }; return render(); }
+  if (a === "signoutNow") { await WW.signOut(); return location.reload(); }
+  if (a === "setText") { ST.settings = Object.assign({}, ST.settings || {}, { text: b.dataset.v }); saveST(); applyTextSize(); return render(); }
+  if (a === "verUpdate") { try { if (ATT && !ATT.end) saveAttempt(); } catch (e) {} location.replace(location.pathname + "?v=" + b.dataset.v); return; }
+  if (a === "verLater") { VER_SNOOZE = Date.now() + 30 * 60000; const el = document.getElementById("verPop"); if (el) el.remove(); return; }
   if (a === "testOut") return startTestOut();
   if (a === "soundTest") return soundTest();
   if (a === "openOutside") return openOutside();
@@ -2199,10 +2506,10 @@ document.addEventListener("click", async ev => {
   // teacher
   if (a === "toTeacher") { mode = "teacher"; clearInterval(hbTimer); SESSION = null; await loadTeacher(); return; }
   if (a === "preview") return enterPreview();
-  if (a === "refresh") { await loadTeacher(); toast("Updated"); return; }
+  if (a === "refresh") { $app.innerHTML = loaderHtml("Refreshing… 🔄"); await loadTeacher(); toast("Updated"); return; }
   if (a === "ttab") { T.tab = b.dataset.tab; return render(); }
   if (a === "wkPrev" || a === "wkNext") { const ks = weekOptions(); const i = ks.indexOf(T.week) + (a === "wkPrev" ? 1 : -1); if (ks[i]) T.week = ks[i]; return render(); }
-  if (a === "selStudent" || a === "openStudent") { T.sel = b.dataset.id; T.week = null; T.view = "student"; if (T.tab === "global") T.tab = "week"; $app.innerHTML = `<div class="splash"><p class="muted">Opening folder…</p></div>`; await loadStudentData(T.sel); window.scrollTo(0, 0); return render(); }
+  if (a === "selStudent" || a === "openStudent") { T.sel = b.dataset.id; T.week = null; T.view = "student"; if (T.tab === "global") T.tab = "week"; $app.innerHTML = loaderHtml("Opening folder… 📂"); await loadStudentData(T.sel); window.scrollTo(0, 0); return render(); }
   if (a === "tBackList") { T.view = "list"; T.data = null; if (T.tab === "global") T.tab = "week"; window.scrollTo(0, 0); return render(); }
   if (a === "tGlobal") { T.view = "list"; T.tab = "global"; return render(); }
   if (a === "copyReport") { const txt = reportText(); try { await navigator.clipboard.writeText(txt); toast("Report copied. Paste it to Claude to make the test"); } catch (e) { showReportText(txt); } return; }
@@ -2228,6 +2535,7 @@ document.addEventListener("submit", ev => { ev.preventDefault(); const f = ev.ta
     else { el.value = ""; el.focus(); toast("Not quite. Look at the word and try again"); } } });
 document.addEventListener("change", async ev => {
   if (ev.target.dataset.change === "myPlan") return savePlan();
+  if (ev.target.dataset.change === "remTime") return saveRemTime(+ev.target.dataset.i, ev.target.value);
   if (ev.target.dataset.change === "obDob") { stashOnboard(); ST._dob = ev.target.value; return render(); }
   if (ev.target.dataset.change === "tSort") { T.sort = ev.target.value; return render(); }
   if (ev.target.dataset.change === "voice") { VOICE = VOICES.find(v => v.name === ev.target.value) || VOICE; try { localStorage.setItem("ww_voice", VOICE.name); } catch (e) {} say("Hello! This is how your words will sound."); } });
@@ -2254,8 +2562,8 @@ async function doLogin() { const m = view.mode || "in"; const em = (document.get
   try {
     if (m === "forgot") { await WW.resetPassword(em); view = { name: "login", mode: "forgot", ok: "Check your email for the reset link (look in spam too)." }; return render(); }
     if (!pw) return;
-    if (m === "up") { if (pw !== ((document.getElementById("lgPw2") || {}).value || "")) { view = { name: "login", mode: "up", err: "The two passwords don't match." }; return render(); } await WW.signUp(em, pw); return; }
-    await WW.signIn(em, pw);
+    if (m === "up") { if (pw !== ((document.getElementById("lgPw2") || {}).value || "")) { view = { name: "login", mode: "up", err: "The two passwords don't match." }; return render(); } $app.innerHTML = loaderHtml("Creating your account… ✨"); await WW.signUp(em, pw); return; }
+    $app.innerHTML = loaderHtml("Signing you in… 🔑"); await WW.signIn(em, pw);
   } catch (e) { view = { name: "login", mode: m, err: authMsg(e) }; render(); } }
 
 /* ---------- boot ---------- */
@@ -2263,10 +2571,10 @@ async function loadStudent(test) {
   const sd = await db.doc(sPath()).get();
   ST = sd.exists ? clone(sd.data()) : newStudent(test);
   if (!sd.exists && !test) { // new sign-up: free beta seat if any are left, otherwise the launch list
-    ST.approved = false; ST.email = (WW.user() && WW.user().email) || "";
+    ST.approved = false; ST.email = (WW.user() && WW.user().email) || ""; if (SID !== ME) ST.parent = ME;
     try { const bd = await db.doc("config/beta").get(); const B = bd.exists ? bd.data() : null;
       if (B && B.on && (B.count || 0) < (B.cap || 0) && db.batch) { const seat = (B.count || 0) + 1; const st2 = Object.assign(clone(ST), { approved: true, betaSeat: seat, approvedAt: Date.now() });
-        await db.batch([{ type: "set", path: sPath(), data: st2 }, { type: "update", path: "config/beta", data: { count: seat } }]); ST = st2; }
+        await db.batch([{ type: "set", path: sPath(), data: st2 }, { type: "update", path: "config/beta", data: { count: seat, last: SID } }]); ST = st2; }
       else if (B && B.on) ST.waitlist = true;
     } catch (e) { console.warn("beta seat", e); ST.approved = false; ST.waitlist = true; } }
   const em = WW.user() && WW.user().email; if (em && ST.email !== em && !test) { ST.email = em; await saveST(); } else if (!sd.exists) await saveST();
@@ -2277,8 +2585,8 @@ async function loadStudent(test) {
     if (changed || atts.length) await saveST();
     loadPacksFor(weekIds());
   }
-  ST.lastSeen = Date.now(); saveST();
-  if (ST.approved !== false && !ST.rejected) trackStudent(); PROG = null;
+  ST.lastSeen = Date.now(); saveST(); applyTextSize();
+  if (ST.approved !== false && !ST.rejected) { trackStudent(); setTimeout(prepStory, 5000); } PROG = null;
   view = { name: studentHome() }; render();
 }
 let booted = false;
@@ -2296,7 +2604,7 @@ async function boot() {
       const c = await db.doc("config/main").get(); if (c.exists) CFG = Object.assign({}, DEFAULT_CFG, c.data());
       SID = ME;
       if (IS_OWNER) { mode = "teacher"; await loadTeacher(); }
-      else { mode = "student"; await loadStudent(false); }
+      else { mode = "student"; await startFamily(false); }
     } catch (e) { console.error(e); mode = "student"; view = { name: "error", msg: /permission/i.test(e.code || e.message || "") ? "The database refused access. Check the Firestore rules step in the setup guide." : (e.message || String(e)) }; render(); }
   });
 }
