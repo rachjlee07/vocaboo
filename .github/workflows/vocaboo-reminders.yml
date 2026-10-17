@@ -1,9 +1,7 @@
 name: Vocaboo reminders
 on:
   schedule:
-    - cron: "0 23 * * *"   # 8:00 am Korea
-    - cron: "0 8 * * *"    # 5:00 pm Korea
-    - cron: "0 11 * * *"   # 8:00 pm Korea
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       slot:
