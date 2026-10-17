@@ -53,7 +53,7 @@ function voicePicker() { if (!VOICES.length) return "";
   return `<div class="card"><h3>Backup voice</h3><div class="field"><label for="voiceSel">Phone voice (used only when a recording is missing)</label><select id="voiceSel" data-change="voice">${VOICES.map(v => `<option value="${esc(v.name)}" ${VOICE && v.name === VOICE.name ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
   <p class="muted small">Voices marked Enhanced or Premium sound best.</p></div>`; }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-function say(text, rate) { if (!("speechSynthesis" in window)) { toast("Sound isn't available on this device"); return; }
+function say(text, rate) { if (!("speechSynthesis" in window)) { toast(/android/i.test(navigator.userAgent) ? "No recording for this yet, and this browser can't read aloud. Open Vocaboo in Chrome." : "No recording for this yet, and this browser can't read aloud. Open Vocaboo in Safari."); return; }
   speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = "en-US"; if (VOICE) u.voice = VOICE; u.rate = rate || 0.9; speechSynthesis.speak(u); }
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let srBroken = !SR;
@@ -206,15 +206,19 @@ let unlocked = false;
 document.addEventListener("pointerdown", () => { if (unlocked) return; unlocked = true;
   try { player.src = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//OEwAAAAAAAAAAAAEluZm8AAAAPAAAABQAAAqAAbW1tbW1tbW1tbW1tbW1tbW1tbZKSkpKSkpKSkpKSkpKSkpKSkpKStra2tra2tra2tra2tra2tra2trbb29vb29vb29vb29vb29vb29vb2///////////////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQEUAAAAAAAAAKgvT9A1gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//NExAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExFMAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKYAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"; player.play().catch(() => {}); } catch (e) {} }, { capture: true });
 function clipFor(id, tag) { let p = PACKS[packOf(id)]; if (!(p && p[id] && p[id][tag]) && PACKS.TEST && PACKS.TEST[id]) p = PACKS.TEST; return p && p[id] && p[id][tag] ? "data:audio/mpeg;base64," + p[id][tag] : null; }
-function speak(id, tag) {
-  const e = BY[id]; if (!e) return;
-  if (tag[0] === "y" && !clipFor(id, tag)) { loadPack(packOf(id)); tag = "s"; }
-  const text = tag === "w" || tag === "s" ? e.w : e.ex[+tag.slice(1)];
-  const rate = tag === "s" ? 0.55 : 0.9;
+let speakTok = 0;
+function playSrc(src, rate, fallback) { try { player.pause(); player.src = src; player.playbackRate = rate || 1; try { player.preservesPitch = true; player.webkitPreservesPitch = true; } catch (x) {} const p = player.play(); if (p) p.catch(fallback); return true; } catch (err) { return false; } }
+async function speak(id, tag) {
+  const e = BY[id]; if (!e) return; const my = ++speakTok;
+  const text = tag === "w" || tag === "s" || tag[0] === "y" ? e.w : e.ex[+tag.slice(1)];
   if ("speechSynthesis" in window) speechSynthesis.cancel();
-  const src = clipFor(id, tag);
-  if (src) { try { player.pause(); player.src = src; player.playbackRate = 1; const p = player.play(); if (p) p.catch(() => say(text, rate)); return; } catch (err) {} }
-  else if (view.name !== "level") loadPack(packOf(id));
+  const pick = () => { if (tag === "s") { const w = clipFor(id, "w"); return w ? [w, 0.7] : null; } // slow = the recorded word, slowed down
+    const c = clipFor(id, tag); if (c) return [c, 1]; if (tag[0] === "y") { const w = clipFor(id, "w"); return w ? [w, 0.7] : null; } return null; };
+  let got = pick();
+  if (!got && view.name !== "level") { // recording may still be downloading: wait for it briefly
+    await Promise.race([loadPack(packOf(id)), new Promise(r => setTimeout(r, 3500))]); if (my !== speakTok) return; got = pick(); }
+  const rate = tag === "s" || tag[0] === "y" ? 0.55 : 0.9;
+  if (got && playSrc(got[0], got[1], () => say(text, rate))) return;
   say(text, rate);
 }
 function stopAudio() { try { player.pause(); } catch (e) {} if ("speechSynthesis" in window) speechSynthesis.cancel(); }
@@ -380,6 +384,7 @@ function renderToday() {
     <div class="row"><span class="streak-chip" style="color:#FFC93C">${I.flame.replace("<svg", '<svg width="18" height="18"')}<span style="color:#fff">${s} day streak</span></span><span class="streak-chip">${mastered}/${ids.length} mastered</span>${ST.level ? `<span class="streak-chip">📈 ${esc(gradeWord(ST.level.g))}</span>` : ""}</div>${levelBar()}</div>
     ${buddy(qd ? "wow" : "happy", 92)}</div></section>
     <div class="week" aria-label="This week" data-tour="week">${days.join("")}</div>
+    ${inappBanner()}${installBanner()}
     ${!IS_OWNER && !pushOn() && WW.pushPermission() !== "denied" && WW.pushPermission() !== "unsupported" ? `<div class="notice info row between"><span>🔔 Get reminders at 8am, 5pm and 8pm</span><button class="primary" data-act="pushOn">Turn on</button></div>` : ""}
     <div class="row between" style="margin-top:6px"><h2>Today's plan</h2><span class="pill ${dayPct === 100 ? "good" : ""}" style="font-size:15px;padding:6px 14px">${dayPct}% done today</span></div>
     ${dayPct === 100 ? `<div class="notice" style="background:var(--mint-soft);color:var(--mint-ink)">🎉 Everything for today is done. Amazing work!</div>` : ""}
@@ -463,6 +468,7 @@ function renderMe() {
    <div class="card"><div class="row between"><h3>Level ${levelInfo().n}</h3><span class="pill sun">${ST.xp || 0} XP</span></div>${levelBar()}<p class="muted small">Earn XP for every right answer, word you learn, sentence and story.</p></div>
    <div class="card"><div class="row between"><h3>Badges</h3><span class="pill">${Object.keys(ST.badges || {}).length}/${BADGES.length}</span></div>${badgeGrid()}</div>
    ${pushCard()}
+   ${micCard()}
    <button class="big icon-l" data-act="tour">🧭 Show me around the app</button>
    ${voicePicker()}
    <div class="card"><h3>Sounds</h3><p class="muted">Words and sentences play recorded audio. If a word has no recording yet, your phone's voice reads it. Pick that voice above.</p></div>
@@ -528,7 +534,7 @@ function renderRun() {
   const fx = document.getElementById("fix"); if (fx) fx.focus();
 }
 function runSayHtml(q, e) {
-  const err = RUN.micErr === "blocked" ? `<div class="notice">The microphone is turned off. On iPhone: Settings → Apps → Safari → Microphone → Allow.</div><button class="big" data-act="sayGiveUp">Skip this question</button>` : RUN.micErr === "unsupported" ? `<button class="big" data-act="sayGiveUp">This phone can't listen · skip</button>` : "";
+  const err = RUN.micErr === "blocked" ? `${micBlockedHtml()}<button class="big" data-act="sayGiveUp">Skip this question</button>` : RUN.micErr === "unsupported" ? `<button class="big" data-act="sayGiveUp">This phone can't listen · skip</button>` : "";
   const needFix = RUN.answered && !RUN.ok && !RUN.fixed && (RUN.fixTries || 0) < 3;
   if (RUN.answered && (RUN.ok || RUN.fixed || !needFix)) return `<div class="fb ${RUN.ok ? "good" : RUN.fixed ? "good" : "bad"}">${RUN.ok ? "Correct! " : RUN.fixed ? "Good, now you said it right. " : "The word is "}<b class="mono">${esc(e.w)}</b></div>`;
   return `${RUN.answered ? `<div class="fb bad">${esc(RUN.heard || "")} The word is <b class="mono">${esc(e.w)}</b>. Listen, then say it to continue.</div><div class="row">${spk(e.id, "w", "Listen", "icon-l")}${spk(e.id, "s", "Slow", "icon-l")}</div>` : (RUN.heard ? `<div class="fb bad">${esc(RUN.heard)}</div>` : "")}
@@ -680,7 +686,7 @@ function renderTrainDone() { const r = view.reason;
 }
 
 /* ---------- speaking ---------- */
-const speakOn = () => CFG.speak !== false && !srBroken;
+const speakOn = () => CFG.speak !== false && !(ST && ST.settings && ST.settings.speak === false) && !srBroken;
 const toks = x => norm(x).replace(/[’']/g, "").replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(Boolean);
 function phKey(s) { // rough sound-alike key
   s = s.toLowerCase().replace(/[^a-z]/g, ""); if (!s) return "";
@@ -712,7 +718,7 @@ function speakHtml(e) {
   const target = tg.kind === "w"
     ? `<div class="stack" style="align-items:center;text-align:center;gap:8px"><p class="muted small" style="font-weight:800">Tap the mic and say the word</p><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div><div class="dots">${Array.from({ length: tg.need }, (_, k) => `<i class="${k < tg.got ? "on" : ""}"></i>`).join("")}</div><div class="row">${spk(e.id, "w", "Listen", "icon-l")}${spk(e.id, "s", "Slow", "icon-l")}</div></div>`
     : `<div class="ex">${spk(e.id, tg.tag)}<p style="font-size:21px;font-weight:700">${exHtml(tg.text, e.w)}</p></div><p class="muted small">Listen first, then read the whole sentence out loud.</p>`;
-  const err = sp.err === "blocked" ? `<div class="notice">The microphone is turned off. On iPhone: <b>Settings → Apps → Safari → Microphone → Allow</b>, and <b>Settings → General → Keyboard → Enable Dictation</b> on. Then tap the button again.</div>`
+  const err = sp.err === "blocked" ? micBlockedHtml()
     : sp.err === "unsupported" ? `<div class="notice">This browser can't listen. Open the app in Safari on your iPhone.</div><button class="big" data-act="cover">Continue to writing</button>` : "";
   return `<div class="card"><div class="row between"><p class="label">Say it out loud</p><div class="chips">${list}</div></div>${target}
     <button class="mic ${sp.listening ? "on" : ""}" id="micBtn" data-act="mic" ${sp.listening ? "disabled" : ""} aria-label="Tap, then speak">${ICON_MIC}</button>
@@ -1001,7 +1007,7 @@ function renderCoach() {
     <button class="mic ${CO.listening ? "on" : ""}" data-act="coachMic" ${CO.listening ? "disabled" : ""} aria-label="Tap, then speak">${ICON_MIC}</button>
     <p class="muted" style="text-align:center;font-weight:800">${CO.listening ? "Listening… stop talking when you're done" : "Tap the mic, then say your sentence"}</p>
     ${CO.listening || CO.text ? `<button class="big icon-l" data-act="coachRedo" style="align-self:center">🔄 Redo · start over</button>` : ""}
-    ${CO.err === "blocked" ? `<div class="notice">The microphone is turned off. On iPhone: Settings → Apps → Safari → Microphone → Allow. You can also type below.</div>` : ""}
+    ${CO.err === "blocked" ? micBlockedHtml("You can also type below.") : ""}
     <div class="field"><label for="coachText">Your sentence (fix it if the app heard you wrong)</label><textarea id="coachText" rows="3" style="font:inherit;font-size:19px;padding:12px 14px;border-radius:18px;border:2px solid var(--line);width:100%;resize:vertical">${esc(CO.text)}</textarea></div>
     <button class="big primary" data-act="coachCheck" ${CO.listening ? "disabled" : ""}>Check my sentence</button>
     ${r && (r.error || r.offline) ? `<button class="ghost" data-act="coachNext" style="align-self:center">Skip to the next word</button>` : ""}`;
@@ -1286,7 +1292,7 @@ function readListen() {
     R.heard = (R.final + " " + fin + " " + inter).trim(); R.cur = fin;
     const a = alignRead(R.heard, R.T); R.ok = a.ok; paintRead();
     clearTimeout(quiet); if (a.pos >= R.T.length - 1) quiet = setTimeout(() => readFinish(), 1200); else quiet = setTimeout(() => readFinish(), 4000); };
-  rec.onerror = ev => { if (/not-allowed|service-not-allowed/.test(ev.error)) { R.listening = false; toast("Microphone is off. Allow it in Settings → Safari."); render(); } };
+  rec.onerror = ev => { if (/not-allowed|service-not-allowed/.test(ev.error)) { R.listening = false; toast("The microphone is off. See ⚙️ My settings → Microphone"); render(); } };
   rec.onend = () => { if (!R.listening) return; R.final = (R.final + " " + (R.cur || "")).trim(); R.cur = "";
     if (R.restarts < 4) { R.restarts++; R.listening = false; R.rec = null; readListen(); } else readFinish(); };
   try { rec.start(); } catch (e) { R.listening = false; }
@@ -1536,6 +1542,7 @@ function openMenu() {
     ${home ? `<button class="menu-item" data-act="menuHome">🏠 ${inRun ? "Stop and go home" : "Home"}</button><button class="menu-item" data-act="menuMe">⚙️ My settings</button>` : ""}
     ${ST && !IS_OWNER && !pushOn() && WW.pushPermission() !== "unsupported" ? `<button class="menu-item" data-act="menuPush">🔔 Turn on reminders</button>` : ""}
     ${ST && ["pending", "rejected"].indexOf(studentHome()) < 0 && ST.profile ? `<button class="menu-item" data-act="feedback">💬 Send feedback</button>` : ""}
+    ${ST && studentHome() === "tabs" ? `<button class="menu-item" data-act="menuMic">🎤 Sound &amp; microphone</button>` : ""}
     <button class="menu-item" data-act="reload">🔄 Reload app</button>
     ${IS_OWNER ? `<button class="menu-item" data-act="menuSurvey">⭐ Preview parent survey</button>` : ""}
     ${IS_OWNER ? `<button class="menu-item" data-act="toTeacher">📊 Teacher dashboard</button>` : `<button class="menu-item danger" data-act="menuSignout">↩️ Sign out</button>`}</div>`;
@@ -1677,6 +1684,74 @@ async function surveySend() {
 }
 function surveyLater() { const S = Object.assign({}, ST.survey || {}); if (S.snoozed) { if (SV.due === "d30") S.d30 = "skipped"; else S.d7 = "skipped"; } else { S.snooze = Date.now() + 2 * 864e5; S.snoozed = true; }
   ST.survey = S; ST.surveyNow = false; saveST(); const el = document.getElementById("survey"); if (el) el.remove(); SV = null; }
+
+/* ---------- microphone help & test ---------- */
+const OS = /android/i.test(navigator.userAgent) ? "android" : /iphone|ipad|ipod|macintosh/i.test(navigator.userAgent) && "ontouchend" in document ? "ios" : "other";
+function micSteps() {
+  if (OS === "android") return `<ol class="small" style="margin:0;padding-left:20px;line-height:1.7">
+    <li><b>In Chrome:</b> tap the <b>⋮</b> or the icon left of the web address → <b>Permissions</b> (or Site settings) → <b>Microphone → Allow</b>.</li>
+    <li><b>If you use the Vocaboo icon:</b> press and hold the icon → <b>App info</b> (ⓘ) → <b>Permissions → Microphone → Allow</b>.</li>
+    <li><b>Phone settings:</b> Settings → Apps → <b>Chrome</b> → Permissions → <b>Microphone → Allow</b>.</li>
+    <li><b>Speech recognition:</b> make sure the <b>Google</b> app is installed and turned on (Settings → Apps → Google → Enable). Android uses it to understand speech.</li></ol>`;
+  if (OS === "ios") return `<ol class="small" style="margin:0;padding-left:20px;line-height:1.7">
+    <li>Settings → Apps → <b>Safari</b> → <b>Microphone → Allow</b> (or Ask).</li>
+    <li>Settings → General → Keyboard → <b>Enable Dictation</b> → on.</li>
+    <li>Settings → <b>Screen Time</b> → Content &amp; Privacy → make sure <b>Microphone</b> and <b>Speech Recognition</b> are allowed.</li>
+    <li>Close Vocaboo completely and open it again.</li></ol>`;
+  return `<p class="small">Click the 🔒 icon next to the web address and set <b>Microphone</b> to <b>Allow</b>, then reload.</p>`;
+}
+function micBlockedHtml(extra) { return `<div class="notice stack" style="gap:6px"><b>🎤 The microphone is turned off</b>${micSteps()}<span class="small">Then tap the mic again.${extra ? " " + esc(extra) : ""}</span></div>`; }
+let MIC = { state: "", heard: "", busy: false };
+function micCard() {
+  const st = MIC.state; const off = CFG.speak === false || SET().speak === false;
+  return `${inappBanner()}<div class="card"><h3>Sound 🔊</h3><p class="muted small">Can't hear the words? Tap to test. Check the volume, and on iPhone turn off silent mode (the switch on the side).</p><button class="big" data-act="soundTest">🔊 Test sound</button></div><div class="card"><h3>Microphone 🎤</h3>
+    <p class="muted small">Vocaboo listens when you say words and sentences. Test it here.</p>
+    ${off ? `<div class="notice info small">Speaking practice is turned off for you by your teacher.</div>` : ""}
+    ${!SR ? `<div class="notice small">This browser can't do speech recognition. ${OS === "android" ? "Open Vocaboo in <b>Chrome</b>." : OS === "ios" ? "Open Vocaboo in <b>Safari</b> or from the home-screen icon." : "Use Chrome or Safari."}</div>` : ""}
+    ${st === "ok" ? `<div class="fb good">✓ The microphone works!${MIC.heard ? " I heard: “" + esc(MIC.heard) + "”" : ""}</div>` : ""}
+    ${st === "noheard" ? `<div class="fb bad">The microphone is on, but I didn't hear anything. Speak a little louder and closer.</div>` : ""}
+    ${st === "blocked" ? micBlockedHtml() : ""}
+    ${st === "nomic" ? `<div class="notice small">No microphone was found. Check that nothing else (like a call or another app) is using it, and that earphones are plugged in properly.</div>` : ""}
+    ${st === "error" ? `<div class="notice small">Something went wrong: ${esc(MIC.msg || "")}. Try reloading the app.</div>` : ""}
+    <button class="big ${MIC.busy ? "" : "primary"}" data-act="micTest" ${MIC.busy || !SR ? "disabled" : ""}>${MIC.busy ? "Listening… say “hello”" : "🎤 Test my microphone"}</button>
+    <details><summary class="small" style="font-weight:800">How to turn the microphone on</summary><div style="margin-top:8px">${micSteps()}</div></details></div>`;
+}
+async function micTest() {
+  MIC = { state: "", heard: "", busy: true }; render();
+  try { if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); } }
+  catch (e) { MIC = { state: /NotAllowed|Permission|Security/i.test(e.name || e.message) ? "blocked" : /NotFound|NotReadable|Overconstrained/i.test(e.name) ? "nomic" : "error", msg: e.name || e.message, busy: false }; return render(); }
+  let rec; try { rec = new SR(); } catch (e) { MIC = { state: "error", msg: "speech recognition unavailable", busy: false }; return render(); }
+  rec.lang = "en-US"; rec.interimResults = true; let heard = "", done = false;
+  const fin = st => { if (done) return; done = true; try { rec.abort(); } catch (x) {} MIC = { state: st || (heard ? "ok" : "noheard"), heard, busy: false, msg: MIC.msg }; render(); };
+  rec.onresult = ev => { heard = Array.from(ev.results).map(r => r[0].transcript).join(" ").trim(); if (heard) setTimeout(() => fin("ok"), 600); };
+  rec.onerror = ev => { MIC.msg = ev.error; fin(/not-allowed|service-not-allowed/.test(ev.error) ? "blocked" : ev.error === "audio-capture" ? "nomic" : ev.error === "no-speech" ? "noheard" : "error"); };
+  rec.onend = () => fin();
+  setTimeout(() => fin(), 6000);
+  try { rec.start(); } catch (e) { MIC.msg = e.message; fin("error"); }
+}
+
+/* ---------- in-app browsers (KakaoTalk, Instagram, Naver…) can't do sound/mic well ---------- */
+const INAPP = /KAKAOTALK|Instagram|FBAN|FBAV|NAVER|Line\/|DaumApps|everytimeApp|; wv\)/i.test(navigator.userAgent);
+function openOutside() { const url = location.href;
+  if (/KAKAOTALK/i.test(navigator.userAgent)) { location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(url); return; }
+  if (OS === "android") { location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end"; return; }
+  try { navigator.clipboard.writeText(url); toast("Link copied. Paste it in Safari"); } catch (e) { toast("Open this link in Safari: " + url); } }
+function inappBanner() { return INAPP ? `<div class="notice stack" style="gap:8px"><b>⚠️ You're inside ${/KAKAOTALK/i.test(navigator.userAgent) ? "KakaoTalk" : /Instagram/i.test(navigator.userAgent) ? "Instagram" : "another app"}'s browser</b><span class="small">Sound and the microphone may not work here. Open Vocaboo in ${OS === "android" ? "Chrome" : "Safari"} instead. 다른 앱 안의 브라우저에서는 소리/마이크가 안 될 수 있어요.</span><button class="primary" data-act="openOutside">Open in ${OS === "android" ? "Chrome" : "Safari"}</button></div>` : ""; }
+function soundTest() { const id = BY.hello ? "hello" : BANK[0].id; speak(id, "w"); setTimeout(() => { if (player.paused && !(window.speechSynthesis && speechSynthesis.speaking)) toast("If you heard nothing: turn up the volume and turn off silent mode"); }, 1500); }
+
+/* ---------- install to home screen ---------- */
+let INSTALL_EVT = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); INSTALL_EVT = e; try { if (mode === "student" && ["tabs", "login"].includes(view.name)) render(); } catch (x) {} });
+window.addEventListener("appinstalled", () => { INSTALL_EVT = null; toast("Vocaboo is on your home screen 🎉"); try { render(); } catch (x) {} });
+const isStandalone = () => !!(navigator.standalone || matchMedia("(display-mode: standalone)").matches);
+function installBanner() {
+  if (isStandalone() || INAPP) return "";
+  if (INSTALL_EVT) return `<div class="notice info row between" style="gap:10px"><span>📲 Put Vocaboo on your home screen</span><button class="primary" data-act="installApp">Install</button></div>`;
+  if (OS === "ios") return `<div class="notice info small">📲 <b>Add to home screen:</b> tap Share <b>⬆︎</b> at the bottom of Safari → <b>Add to Home Screen</b> → Add. Then open Vocaboo from the icon.</div>`;
+  if (OS === "android") return `<div class="notice info small">📲 <b>Add to home screen:</b> in Chrome tap <b>⋮</b> (top right) → <b>Add to Home screen</b> or <b>Install app</b> → Install. Then open Vocaboo from the icon.</div>`;
+  return "";
+}
+async function installApp() { if (!INSTALL_EVT) return; INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; render(); }
 let T = { students: [], sel: null, data: null, tab: "week", week: null, names: {}, view: "list", q: "", sort: "name" };
 async function loadTeacher() {
   const list = await getAll("students");
@@ -1759,7 +1834,7 @@ async function resetTest() {
 }
 async function saveStu() {
   const st = T.data.st; const v = id => document.getElementById(id).value; const n = (id, lo, hi) => Math.min(hi, Math.max(lo, +v(id) || 0));
-  st.settings = Object.assign({}, st.settings || {}, { lang: v("sLang"), textbook: v("sTb") === "1", tbNew: n("sTbNew", 0, 40), startUnit: n("sStart", 1, 30), grNew: n("sGrNew", 0, 40), review: n("sRev", 0, 30), kor: v("sKor") === "1" });
+  st.settings = Object.assign({}, st.settings || {}, { lang: v("sLang"), textbook: v("sTb") === "1", tbNew: n("sTbNew", 0, 40), startUnit: n("sStart", 1, 30), grNew: n("sGrNew", 0, 40), review: n("sRev", 0, 30), kor: v("sKor") === "1", speak: v("sSpeak") === "1" });
   if (v("sGoal") !== "") st.goal = Object.assign({}, st.goal || { from: st.level ? st.level.g : 0 }, { g: n("sGoal", 0, 13), by: v("sGoalBy") || addDays(today(), 182), auto: false });
   if (v("sLevel") !== "" && st.level && Math.abs(+v("sLevel") - st.level.g) > 0.04) { const g = n("sLevel", 0, 13); st.level = Object.assign({}, st.level, { g, lo: Math.max(0, g - 0.3), hi: Math.min(13, g + 0.3), set: "teacher" }); }
   st.quizSize = n("cfgSize", 5, 30);
@@ -1920,6 +1995,7 @@ function stuSettingsHtml() {
    <div class="field"><label for="sTbNew">New textbook words per week</label><input id="sTbNew" type="number" min="0" max="40" value="${s.tbNew}"></div>
    <div class="field"><label for="sStart">Textbook starts at unit</label><input id="sStart" type="number" min="1" max="30" value="${s.startUnit || CFG.startUnit}"></div>
    <div class="field"><label for="sKor">Korean school words (교육부 기본 어휘 3,000) first</label><select id="sKor"><option value="1" ${(s.kor != null ? s.kor : s.lang !== "en") ? "selected" : ""}>On</option><option value="0" ${(s.kor != null ? s.kor : s.lang !== "en") ? "" : "selected"}>Off</option></select></div>
+   <div class="field"><label for="sSpeak">Speaking practice for this student</label><select id="sSpeak"><option value="1" ${s.speak !== false ? "selected" : ""}>Required</option><option value="0" ${s.speak === false ? "selected" : ""}>Off (microphone doesn't work)</option></select></div>
    <div class="field"><label for="sGrNew">New graded-list words per week</label><input id="sGrNew" type="number" min="0" max="40" value="${s.grNew}"></div>
    <div class="field"><label for="sRev">Review words per week</label><input id="sRev" type="number" min="0" max="30" value="${s.review}"></div>
    <div class="field"><label for="sGoal">Goal level (grade, 0 = K)</label><input id="sGoal" type="number" min="0" max="13" step="0.1" value="${st.goal ? st.goal.g : ""}"></div>
@@ -1965,6 +2041,11 @@ document.addEventListener("click", async ev => {
   if (a === "pushAskYes") { closePushAsk(); return turnOnPush(); }
   if (a === "pushAskNo") return closePushAsk();
   if (a === "checkApproved") return checkApproved();
+  if (a === "micTest") return micTest();
+  if (a === "soundTest") return soundTest();
+  if (a === "openOutside") return openOutside();
+  if (a === "installApp") return installApp();
+  if (a === "menuMic") { closeMenu(); leaveActivity(); TAB = "me"; view = { name: studentHome() }; render(); setTimeout(() => { const c = [...document.querySelectorAll(".card h3")].find(h => /Microphone/.test(h.textContent)); if (c) c.scrollIntoView({ behavior: "smooth", block: "center" }); }, 100); return; }
   if (a === "lgMode") { view = { name: "login", mode: b.dataset.m }; return render(); }
   if (a === "resetMe") return resetAsk(1);
   if (a === "resetStep2") return resetAsk(2);
@@ -2113,8 +2194,8 @@ function renderLogin() {
     ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Create account</button>`;
   else body = `${tabs}${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}${field("lgPw", "Password", "password", "current-password")}
     ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Sign in</button><button type="button" class="ghost" data-act="lgMode" data-m="forgot" style="align-self:center">Forgot password?</button>`;
-  $app.innerHTML = `<section class="hero" style="text-align:center;padding-bottom:80px"><div class="stack" style="align-items:center;gap:10px;padding-top:30px">${buddy("happy", 110)}<h1>Vocaboo</h1><p class="muted">Train your words every day</p></div></section>
-  <form class="card" data-form="login" style="margin-top:-56px;position:relative">${body}</form>`;
+  $app.innerHTML = (INAPP ? `<div style="padding-top:12px">${inappBanner()}</div>` : "") + `<section class="hero" style="text-align:center;padding-bottom:80px"><div class="stack" style="align-items:center;gap:10px;padding-top:30px">${buddy("happy", 110)}<h1>Vocaboo</h1><p class="muted">Train your words every day</p></div></section>
+  <form class="card" data-form="login" style="margin-top:-56px;position:relative">${body}</form>${installBanner()}`;
 }
 const authMsg = e => { const c = (e && e.code) || ""; return /invalid-email/.test(c) ? "That email doesn't look right." : /email-already-in-use/.test(c) ? "An account with this email already exists. Try signing in." : /weak-password/.test(c) ? "Use a password with at least 6 characters." : /invalid|wrong|not-found|credential/.test(c) ? "That email or password isn't right." : /too-many/.test(c) ? "Too many tries. Wait a few minutes and try again." : "Something went wrong: " + (c || (e && e.message)); };
 async function doLogin() { const m = view.mode || "in"; const em = (document.getElementById("lgEmail") || {}).value || "", pw = (document.getElementById("lgPw") || {}).value || "";
