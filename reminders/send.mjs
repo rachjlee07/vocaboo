@@ -26,13 +26,14 @@ function message(st, slot, today) {
   const s = st.streak || {}; const gap = s.last ? Math.round((new Date(today + "T12:00:00Z") - new Date(s.last + "T12:00:00Z")) / 864e5) : 99;
   const streak = gap <= 1 + (st.freezes || 0) ? s.count || 0 : 0;
   const locked = st.lock && st.lock.on;
-  const newWeek = st.week && !st.week.introDone;
+  const wd = new Date(today + "T12:00:00Z").getUTCDay(); const studyDay = wd >= 1 && wd <= 5;
+  const packDue = st.week && !st.week.introDone && studyDay && !(st.week.day && st.week.day.d === today && (st.week.trained || []).length >= st.week.day.start + st.week.day.due);
   if (slot === "morning") {
-    if (newWeek) return { title: `New words this week${name}! 🌱`, body: "Learn this week's words and unlock your daily quiz." };
+    if (packDue) return { title: `Today's new words are ready${name}! 🌱`, body: "Just a few words today. Learn them and unlock your daily quiz." };
     return { title: `Good morning${name}! ☀️`, body: streak ? `Your ${streak}-day streak 🔥 is waiting. A quick quiz keeps it going!` : "Your words are waiting. Start a new streak today!" };
   }
   if (slot === "afternoon") {
-    if (done) return st.coachDay === today ? null : { title: `Nice work today${name}! 💬`, body: "Try the sentence coach: say 3 of your own sentences." };
+    if (done) return st.coachDay === today ? null : { title: `Nice work today${name}! 💬`, body: "Try the sentence coach: make a few sentences with your words." };
     if (locked) return { title: "Let's fix those words 💪", body: "Train your missed words to unlock the daily quiz." };
     return { title: `Quiz time${name}! ✏️`, body: "Your daily quiz takes about 10 minutes." };
   }
