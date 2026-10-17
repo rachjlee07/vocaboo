@@ -204,6 +204,16 @@ pre.report{white-space:pre-wrap;font-family:var(--f-mono);font-size:13px;backgro
 .tour{position:fixed;inset:0;z-index:80}
 .tour-hole{position:fixed;border-radius:22px;box-shadow:0 0 0 9999px rgba(30,22,56,.62);outline:3px solid var(--sun);pointer-events:none;transition:all .2s}
 .tour-card{position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));max-width:480px;margin:0 auto;background:#fff;border-radius:22px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 40px -12px rgba(0,0,0,.45)}
+.dmiss{color:var(--coral-ink);background:var(--coral-soft);border-radius:4px;padding:0 3px;font-weight:800}
+.slot-bar{height:8px;border-radius:99px;background:var(--bg);overflow:hidden;margin-top:4px;margin-right:8px}
+.slot-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--violet-2),var(--violet))}
+.slot-pct{font-size:12px;font-weight:900;color:var(--violet)}
+.step-card.complete{background:linear-gradient(135deg,#E6FAF3,#C9F2E3);box-shadow:0 10px 24px -14px rgba(31,169,143,.6)}
+.step-card.complete h3{color:var(--mint-ink)}
+.step-card.complete .slot-bar i{background:var(--mint)}
+.step-card.complete .slot-pct{color:var(--mint-ink)}
+.done-art{font-size:54px;background:rgba(255,255,255,.5)}
+.rw{border-radius:6px;padding:0 2px;transition:background .2s}.rw.on{background:var(--mint-soft);color:var(--mint-ink)}.rw.miss{background:var(--coral-soft);color:var(--coral-ink)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -214,6 +224,7 @@ pre.report{white-space:pre-wrap;font-family:var(--f-mono);font-size:13px;backgro
 <div id="toast" class="toast" hidden></div>
 <script src="config.js"></script>
 <script src="words.js"></script>
+<script src="stories.js"></script>
 <script src="app.js"></script>
 <script type="module" src="fb.js"></script>
 </body>
