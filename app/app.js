@@ -104,6 +104,7 @@ function buildWeek(st, words, cfg, force) {
     shuffle(GRADED.filter(e => !e.soft && e.g >= L - 1.5 && e.g < L - 0.3 && !words[e.id] && !known.has(e.id))).forEach(e => rev.length < cfg.reviewPerWeek && take(e.id)); }
   if (prev) { st.history = (st.history || []).concat([{ key: prev.key, newIds: prev.newIds, reviewIds: prev.reviewIds }]).slice(-40); }
   st.week = { key, newIds, reviewIds: rev, introDone: false, trained: [], created: Date.now() };
+  if (st._hard) { st.week.hard = st._hard; delete st._hard; }
   return true;
 }
 function growQuiz(st, attempts) {
@@ -330,6 +331,7 @@ function renderInner() {
   if (v === "levelIntro") { setShell("bare"); return renderLevelIntro(); }
   if (v === "level") { setShell("focus"); return renderLevel(); }
   if (v === "levelResult") { setShell("focus"); return renderLevelResult(); }
+  if (v === "testoutResult") { setShell("focus"); return renderTestOutResult(); }
   if (v === "run") { setShell("focus"); return renderRun(); }
   if (v === "train") { setShell("focus"); return renderTrain(); }
   if (v === "result") { setShell("focus"); return renderResult(); }
@@ -388,7 +390,8 @@ function renderToday() {
     ${!IS_OWNER && !pushOn() && WW.pushPermission() !== "denied" && WW.pushPermission() !== "unsupported" ? `<div class="notice info row between"><span>🔔 Get reminders at 8am, 5pm and 8pm</span><button class="primary" data-act="pushOn">Turn on</button></div>` : ""}
     <div class="row between" style="margin-top:6px"><h2>Today's plan</h2><span class="pill ${dayPct === 100 ? "good" : ""}" style="font-size:15px;padding:6px 14px">${dayPct}% done today</span></div>
     ${dayPct === 100 ? `<div class="notice" style="background:var(--mint-soft);color:var(--mint-ink)">🎉 Everything for today is done. Amazing work!</div>` : ""}
-    <div class="path">${trainCard}${quizCard}${coachCard}${storyCard}${bonusCard}</div>`;
+    <div class="path">${trainCard}${quizCard}${coachCard}${storyCard}${bonusCard}</div>
+    ${testOutCard()}`;
   if (!tourAsked && !IS_OWNER && maybeAskPush()) { tourAsked = true; return; }
   if (ST.tourDone && TI < 0) setTimeout(() => { if (view.name === "tabs" && TAB === "today") maybeSurvey(); }, 700);
   if (!ST.tourDone && TI < 0 && !tourAsked) { tourAsked = true; setTimeout(startTour, 500); }
@@ -404,8 +407,9 @@ function renderPlacementIntro() {
 /* ---------- Words tab ---------- */
 function renderWords() {
   const wk = ST.week; const sec = (title, ids) => `<div class="card"><div class="row between"><h3>${title}</h3><span class="pill">${ids.length}</span></div><div>${ids.map(id => { const e = BY[id]; const w = WORDS[id]; const box = w ? w.box : 0;
-    return `<button class="list-row" data-act="openWord" data-id="${id}"><span style="display:grid;place-items:center">${ring(Math.min(100, box / MASTER_BOX * 100), isMastered(id) ? "#1FA98F" : "#7B61FF", 44)}</span><span style="flex:1;min-width:0"><b style="font-size:18px">${esc(e.w)}</b><br><span class="muted small">${esc(gloss(e))}</span></span>${isMastered(id) ? '<span class="pill good">mastered</span>' : ""}<span class="muted">${I.chev.replace("<svg", '<svg width="18" height="18"')}</span></button>`; }).join("")}</div></div>`;
+    return `<button class="list-row" data-act="openWord" data-id="${id}"><span style="display:grid;place-items:center">${ring(Math.min(100, box / MASTER_BOX * 100), isMastered(id) ? "#1FA98F" : "#7B61FF", 44)}</span><span style="flex:1;min-width:0"><b style="font-size:18px">${esc(e.w)}</b>${(ST.week && ST.week.hard || []).includes(id) ? ' <span class="pill sun" style="font-size:11px">⭐ challenge</span>' : ""}<br><span class="muted small">${esc(gloss(e))}</span></span>${isMastered(id) ? '<span class="pill good">mastered</span>' : ""}<span class="muted">${I.chev.replace("<svg", '<svg width="18" height="18"')}</span></button>`; }).join("")}</div></div>`;
   $app.innerHTML = `${previewBar()}<div class="stack" style="padding-top:18px"><span class="eyebrow">Week of ${wk ? wkShort(wk.key) : ""}</span><h1>Your words</h1><p class="muted">Tap a word to hear it and see its card. The ring fills as you master it.</p></div>
+    ${testOutCard()}
     ${wk ? sec("New this week", wk.newIds) + sec("Review", wk.reviewIds) : ""}`;
 }
 function wkShort(k) { const a = new Date(k + "T12:00:00"); return (a.getMonth() + 1) + "/" + a.getDate(); }
@@ -491,7 +495,7 @@ async function startRun(kind) {
 }
 function autoSpeak() { const q = RUN && RUN.qs[RUN.i]; if (q && (q.t === "dict" || q.t === "hear_ko")) speak(q.id, "w"); }
 function qPrompt(q) {
-  const e = BY[q.id]; const hint = (RUN && RUN.kind === "quiz" ? hintsToday() : CFG.hints) ? `<p class="hint">${esc(e.w[0])}${" _".repeat(Math.max(0, e.w.length - 1))}</p>` : "";
+  const e = BY[q.id]; const hint = (RUN && RUN.kind === "quiz" ? hintsToday() : RUN && RUN.kind === "testout" ? false : CFG.hints) ? `<p class="hint">${esc(e.w[0])}${" _".repeat(Math.max(0, e.w.length - 1))}</p>` : "";
   const kos = `<div class="stack" style="gap:6px">${e.senses.map(x => `<div class="sense"><span class="pos-tag">${esc(x.pos)}</span><p class="q-prompt">${esc(sgloss(x))}</p></div>`).join("")}</div>`;
   if (q.t === "mc_ko") return `<p class="label">What does this word mean?</p><div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div>${spk(e.id, "w")}</div>`;
   if (q.t === "mc_def") return `<p class="label">Which word matches?</p><p class="q-prompt">${esc(e.def)}</p>`;
@@ -529,7 +533,7 @@ function renderRun() {
     if (enTyped && !RUN.ok && !RUN.fixed) fb += fixForm(e, "fixQuiz");
     else fb += `${enTyped && !RUN.ok ? `<div class="fb good">Good. Now you've spelled it right.</div>` : ""}` + nextBtn;
   }
-  $app.innerHTML = `${topbar(RUN.i, RUN.qs.length)}<span class="eyebrow">${RUN.kind === "placement" ? "Word check" : "Daily quiz"}</span><div class="card">${qPrompt(q)}${body}${fb}</div>`;
+  $app.innerHTML = `${topbar(RUN.i, RUN.qs.length)}<span class="eyebrow">${RUN.kind === "placement" ? "Word check" : RUN.kind === "testout" ? "Test-out quiz · need 80%" : "Daily quiz"}</span><div class="card">${qPrompt(q)}${body}${fb}</div>`;
   const inp = document.getElementById("ans"); if (inp && !RUN.answered) inp.focus();
   const fx = document.getElementById("fix"); if (fx) fx.focus();
 }
@@ -572,6 +576,7 @@ function next() {
   render(); autoSpeak();
 }
 function finishRun() {
+  if (RUN.kind === "testout") return finishTestOut();
   const n = RUN.qs.length, score = RUN.right / n;
   ATT.end = Date.now(); ATT.score = score;
   const wrongIds = [...new Set(ATT.items.filter(i => !i.ok).map(i => i.id))];
@@ -1356,8 +1361,15 @@ function gradedPick(st, words, used, n) {
   if (out.length < n) {
     const kor = s.kor != null ? s.kor : s.lang !== "en"; const age = ageOf(st) || 11;
     const bonus = e => !kor || !e.kr ? 0 : e.kr === 1 ? 1.5 : e.kr === 2 ? 1.2 : age >= 14 ? 1.0 : 0.4; // Korean school words come first
-    const cand = GRADED.filter(e => e.g >= L - (kor && e.kr ? 1.5 : 0.3) && !e.soft && (!s.textbook || e.book === "G" || e.book === "H") && !known.has(e.id) && ok(e.id)).sort((a, b) => (a.g - bonus(a)) - (b.g - bonus(b)));
+    const base = e => !e.soft && (!s.textbook || e.book === "G" || e.book === "H") && !known.has(e.id) && ok(e.id);
+    // a few challenge words (1–2.5 grades above her level) mixed in with at-level words
+    const mix = st._mix != null ? st._mix : 0.2; const nC = Math.round((n - out.length) * mix);
+    const hard = shuffle(GRADED.filter(e => base(e) && e.kr !== 1 && e.g >= L + 1 && e.g <= L + 2.5)).sort((a, b) => (b.kr ? 1 : 0) - (a.kr ? 1 : 0)).slice(0, nC);
+    hard.forEach(e => out.push(e.id));
+    const below = st._mix != null ? 0 : (kor ? 1.5 : 0.3); // after a test-out: nothing below her level
+    const cand = GRADED.filter(e => base(e) && e.g >= L - (e.kr ? below : 0.3) && (st._mix == null || e.g >= L)).sort((a, b) => (a.g - bonus(a)) - (b.g - bonus(b)));
     for (const e of cand) { if (out.length >= n) break; out.push(e.id); }
+    st._hard = hard.map(e => e.id);
   }
   return out;
 }
@@ -1752,6 +1764,44 @@ function installBanner() {
   return "";
 }
 async function installApp() { if (!INSTALL_EVT) return; INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; render(); }
+
+/* ---------- "too easy?" test-out quiz ---------- */
+const canTestOut = () => !!(ST && ST.week && ST.week.newIds.length >= 4 && (ST.week.testOuts || 0) < 2 && !(ST.lock && ST.lock.on));
+function testOutCard() { if (!canTestOut()) return "";
+  return `<div class="card row between" style="gap:12px;flex-wrap:nowrap"><div class="stack" style="gap:2px"><b>Words too easy? 🚀</b><span class="muted small">Take a quick quiz on this week's new words. Get 80% or more and you get a new, harder set.</span></div><button class="primary" data-act="testOut" style="flex:none">Test out</button></div>`; }
+async function startTestOut() {
+  if (!canTestOut()) return; const ids = shuffle(ST.week.newIds.slice());
+  const qs = ids.map((id, i) => makeQ2(id, i % 2 ? (KO() ? "ko_en" : "def_en") : (KO() ? "mc_ko" : "mc_def"), ids));
+  RUN = { kind: "testout", qs, i: 0, t0: Date.now(), answered: false, right: 0 };
+  startAttempt("testout", { n: qs.length }); logDid("test-out");
+  view = { name: "run" }; render(); await loadPacksFor(ids); RUN && (RUN.t0 = Date.now());
+}
+function finishTestOut() {
+  const n = RUN.qs.length, score = RUN.right / n, pass = score >= 0.8; const wk = ST.week;
+  ATT.end = Date.now(); ATT.score = score; ATT.passed = pass; saveAttempt();
+  const okIds = [...new Set(ATT.items.filter(i => i.ok).map(i => i.id))]; const missIds = [...new Set(ATT.items.filter(i => !i.ok).map(i => i.id))];
+  wk.testOuts = (wk.testOuts || 0) + 1;
+  let fresh = null;
+  if (pass) {
+    okIds.forEach(id => { const w = wordDoc(id); w.box = Math.max(w.box, MASTER_BOX); w.due = addDays(today(), INTERVALS[MASTER_BOX]); w.testedOut = Date.now(); saveWord(id); });
+    if (ST.level) { ST.level.known = [...new Set((ST.level.known || []).concat(okIds))]; ST.level.g = +Math.min(MAXG, ST.level.g + 0.5).toFixed(2); ST.level.bumps = (ST.level.bumps || 0) + 1; }
+    const keep = { key: wk.key, testOuts: wk.testOuts, reviewIds: wk.reviewIds };
+    ST._mix = 0.4; buildWeek(ST, WORDS, effCfg(ST), true); delete ST._mix;
+    ST.week.key = keep.key; ST.week.testOuts = keep.testOuts;
+    ST.week.reviewIds = [...new Set(missIds.concat(keep.reviewIds))].filter(id => !ST.week.newIds.includes(id)).slice(0, Math.max(effCfg(ST).reviewPerWeek, missIds.length));
+    ST.week.introDone = false; ST.week.trained = []; ST.week.hard = ST.week.hard || [];
+    fresh = ST.week.newIds.slice(); award(30, "test-out"); loadPacksFor(weekIds());
+  }
+  saveST(); PROG = null;
+  view = { name: "testoutResult", pass, pct: Math.round(score * 100), right: RUN.right, n, fresh, missIds }; RUN = null; render();
+}
+function renderTestOutResult() { const v = view;
+  $app.innerHTML = `<div style="height:14px"></div><div class="result-hero ${v.pass ? "" : "bad"}">${buddy(v.pass ? "wow" : "happy", 96)}${ring(v.pct, v.pass ? "#FFC93C" : "#fff", 140, `<text x="50%" y="56%" text-anchor="middle" font-size="32" font-weight="900" fill="#fff" font-family="Nunito, sans-serif">${v.pct}%</text>`)}
+    <h1>${v.pass ? "You tested out! 🚀" : "These words are just right"}</h1><p style="opacity:.9">${v.right} of ${v.n} correct</p></div>
+  ${v.pass ? `<div class="card"><h3>Your new, harder words</h3><p class="muted small">A mix of words at your level and ⭐ challenge words. Learn them to unlock today's quiz.</p><div class="chips">${v.fresh.map(id => `<span class="chip">${(ST.week.hard || []).includes(id) ? "⭐ " : ""}${esc(BY[id].w)}</span>`).join("")}</div>${v.missIds.length ? `<p class="muted small">The ${v.missIds.length} word${v.missIds.length === 1 ? "" : "s"} you missed moved to your review list.</p>` : ""}</div>`
+    : `<div class="notice">You need 80% to get new words. Keep training these. You can try again ${(ST.week.testOuts || 0) < 2 ? "once more this week" : "next week"}.</div>`}
+  <button class="big primary" data-act="${v.pass ? "train" : "home"}">${v.pass ? "Learn my new words" : "Back home"}</button>`;
+}
 let T = { students: [], sel: null, data: null, tab: "week", week: null, names: {}, view: "list", q: "", sort: "name" };
 async function loadTeacher() {
   const list = await getAll("students");
@@ -2042,6 +2092,7 @@ document.addEventListener("click", async ev => {
   if (a === "pushAskNo") return closePushAsk();
   if (a === "checkApproved") return checkApproved();
   if (a === "micTest") return micTest();
+  if (a === "testOut") return startTestOut();
   if (a === "soundTest") return soundTest();
   if (a === "openOutside") return openOutside();
   if (a === "installApp") return installApp();
