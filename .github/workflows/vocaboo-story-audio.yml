@@ -1,0 +1,48 @@
+name: Vocaboo story audio
+# Records AI-written stories with the natural Bella voice.
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 minutes (GitHub may run it a little late)
+  workflow_dispatch:
+concurrency:
+  group: story-audio
+  cancel-in-progress: false
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check for new stories
+        id: check
+        run: |
+          pip install -q firebase-admin==7.7.0
+          python tts/story_tts.py
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          CHECK_ONLY: "1"
+      - name: Get the voice model
+        if: steps.check.outputs.pending != '0'
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: tts/kokoro.onnx
+          key: kokoro-q8-1.0.0
+      - name: Download the voice model
+        if: steps.check.outputs.pending != '0' && steps.model.outputs.cache-hit != 'true'
+        run: |
+          cd tts
+          npm pack kokoro-q8-shards@1.0.0 --silent
+          tar xzf kokoro-q8-shards-1.0.0.tgz
+          cat package/kokoro-q8.part*.bin > kokoro.onnx
+          rm -rf package kokoro-q8-shards-1.0.0.tgz
+      - name: Record stories
+        if: steps.check.outputs.pending != '0'
+        run: |
+          pip install -q kokoro-onnx==0.6.1 phonemizer==3.4.0 espeakng-loader==0.2.4 lameenc==1.9.0 numpy
+          python tts/story_tts.py
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
