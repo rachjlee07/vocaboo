@@ -2,7 +2,6 @@
 # Runs on GitHub Actions every few minutes. Finds stories marked needsAudio,
 # makes one MP3 per story part, and saves it next to the story in Firestore.
 import base64, json, os, re, sys, time
-import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -20,6 +19,7 @@ def kokoro():
     return _k
 
 def tts_part(text):
+    import numpy as np
     from g2p import g2p
     import lameenc
     k = kokoro(); sr = 24000; chunks = []
