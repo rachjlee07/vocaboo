@@ -41,7 +41,8 @@ html.theme-stamp{--bg:#FBF8F2;--card:#FFFFFF;--ink:#1A1A1A;--accent:#FF4B3E;--ac
 html,body{margin:0;background:var(--bg);color:var(--ink);min-height:100%}
 body{font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
 #app{max-width:520px;margin:0 auto;min-height:100vh;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(110px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:18px}
-#app.focus{padding-bottom:calc(28px + env(safe-area-inset-bottom,0px))}
+#app.focus{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+#app.focus>*{flex:none}#app.focus>.ob-wrap,#app.focus>.hello,#app.focus>form.ob-wrap{flex:1 1 auto;min-height:0}
 #app.wide{max-width:1120px}
 h1,h2,h3{font-family:var(--f-display);margin:0;letter-spacing:-.01em;text-wrap:balance;line-height:1.15}
 h1{font-size:30px;font-weight:900} h2{font-size:21px;font-weight:900} h3{font-size:17px;font-weight:800}
@@ -496,7 +497,7 @@ mark{text-decoration-color:var(--accent)}
 .splash-full .sp-sub{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;opacity:.7;margin-top:6px;animation:introIn .6s .8s both}
 .splash-full.out{animation:spOut .35s ease-in both;pointer-events:none}
 @keyframes spOut{to{opacity:0;transform:scale(1.04)}}
-.hello{min-height:100vh;min-height:100dvh;margin:-16px -16px -40px;padding:40px 24px 32px;background:var(--accent);color:var(--accent-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
+.hello{min-height:0;margin:calc(-1 * env(safe-area-inset-top,0px)) -16px calc(-20px - env(safe-area-inset-bottom,0px));padding:calc(36px + env(safe-area-inset-top,0px)) 24px calc(24px + env(safe-area-inset-bottom,0px));background:var(--accent);color:var(--accent-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
 .hello.wait *{animation-play-state:paused}
 .hello .hl-eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;animation:introIn .5s .3s both}
 .hello h1{font-family:var(--f-ko);font-weight:400;font-size:42px;letter-spacing:0;line-height:1.05;margin:0;animation:introIn .5s .45s both}
@@ -513,7 +514,7 @@ mark{text-decoration-color:var(--accent)}
 .ob-screen.back{animation-name:obInL}
 @keyframes obIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
 @keyframes obInL{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
-.ob-wrap{min-height:calc(100vh - 60px);min-height:calc(100dvh - 60px);justify-content:flex-start;padding-top:8px}
+.ob-wrap{min-height:0;justify-content:flex-start;padding-top:8px;padding-bottom:0}
 .ob-wrap .ob-foot{margin-top:auto;padding-top:10px}
 .ob-wrap .ob-foot .primary:disabled{background:var(--soft);color:var(--muted);opacity:1}
 .ob-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:22px;padding:30px 0 10px}
