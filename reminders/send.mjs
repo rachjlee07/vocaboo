@@ -26,7 +26,7 @@ function message(st, slot, today) {
   const s = st.streak || {}; const gap = s.last ? Math.round((new Date(today + "T12:00:00Z") - new Date(s.last + "T12:00:00Z")) / 864e5) : 99;
   const streak = gap <= 1 + (st.freezes || 0) ? s.count || 0 : 0;
   const locked = st.lock && st.lock.on;
-  const wd = new Date(today + "T12:00:00Z").getUTCDay(); const studyDay = wd >= 1 && wd <= 5;
+  const wi = st.week ? (((Math.round((new Date(today + "T12:00:00Z") - new Date(st.week.key + "T12:00:00Z")) / 864e5)) % 7) + 7) % 7 : 0; const studyDay = wi < 5; // first 5 days of each week
   const packDue = st.week && !st.week.introDone && studyDay && !(st.week.day && st.week.day.d === today && (st.week.trained || []).length >= st.week.day.start + st.week.day.due);
   if (slot === "morning") {
     if (packDue) return { title: `Today's new words are ready${name}! 🌱`, body: "Just a few words today. Learn them and unlock your daily quiz." };
@@ -49,7 +49,7 @@ for (const doc of snap.docs) {
   const tokens = (st.push && st.push.tokens) || [];
   if (!tokens.length) continue;
   const { day, hour } = localParts(st.push && st.push.tz);
-  const times = (st.push && Array.isArray(st.push.times)) ? st.push.times : [8, 17, 20];
+  const times = (st.push && Array.isArray(st.push.times)) ? st.push.times : [17];
   let slot = FORCE;
   if (!slot) {
     if (!times.includes(hour)) continue;
