@@ -217,7 +217,6 @@ async function speak(id, tag) {
   const e = BY[id]; if (!e) return; const my = ++speakTok;
   const text = tag === "w" || tag === "s" || tag[0] === "y" ? e.w : e.ex[+tag.slice(1)];
   if ("speechSynthesis" in window) speechSynthesis.cancel();
-  if (tag[0] === "y") { const part = (e.syl || e.w).split("·")[+tag.slice(1)]; stopAudio(); return say(part || e.w, 0.75); } // a syllable: say only that piece
   const pick = () => { if (tag === "s") { const w = clipFor(id, "w"); return w ? [w, 0.7] : null; } // slow = the recorded word, slowed down
     const c = clipFor(id, tag); if (c) return [c, 1]; if (tag[0] === "y") { const w = clipFor(id, "w"); return w ? [w, 0.7] : null; } return null; };
   let got = pick();
@@ -309,7 +308,7 @@ function mascotMove(x, y, sc, snap) { const el = MASCOT.el; if (snap) el.classLi
 function mascotSync(snap) {
   const slot = document.querySelector(".mslot"); if (!slot) { if (MASCOT.el) { MASCOT.el.remove(); MASCOT.el = null; MASCOT.key = ""; } return; }
   const el = mascotEl(slot.dataset.fill === "auto" ? (/theme-/.test(document.documentElement.className) ? "" : "#FFFFFF") : slot.dataset.fill); const sv = el.firstElementChild; const sc = +slot.dataset.sc || 1; const r = slot.getBoundingClientRect();
-  const x = r.left + window.scrollX + (r.width - 150 * sc) / 2 + (150 * sc - 150) / 2; const y = r.top + window.scrollY + r.height - 180 + (180 - 180 * sc);
+  const x = r.left + (r.width - 150) / 2; const y = r.top + r.height - 180; // feet on the slot's bottom edge, scaled about the feet
   const key = slot.dataset.key || slot.className; const fresh = MASCOT.key !== key; MASCOT.tm.forEach(clearTimeout); MASCOT.tm = [];
   sv.classList.toggle("hold", slot.dataset.hold === "1"); if (fresh) sv.classList.remove("m-cheer");
   if (fresh && slot.dataset.act === "run") { mascotMove(x, y - 120 * sc, .18, true); el.style.transitionDuration = "1.6s"; MASCOT.tm.push(setTimeout(() => { mascotMove(x, y, sc); mascotAct("act-run"); }, 30)); MASCOT.tm.push(setTimeout(() => { el.style.transitionDuration = ""; mascotAct("act-wave", 2000); }, 2500)); }
@@ -323,13 +322,17 @@ function mascotSync(snap) {
 }
 window.addEventListener("resize", () => { try { mascotSync(true); } catch (e) {} });
 function mascotNext() { mascotAct("act-nod", 500); MASCOT.tm.push(setTimeout(mascotWrite, 200)); }
+/* "Vocaboo!" signature: a bubbly rising jingle on the first tap after opening (browsers only allow sound after a tap) */
+let JINGLED = false;
+function jingle() { if (JINGLED) return; JINGLED = true; try { if (typeof fxOn === "function" && !fxOn()) return; tone([[523, 0, .14], [659, .11, .14], [784, .22, .14], [1047, .33, .3], [1319, .42, .5]], "triangle", .16); setTimeout(() => tone([[1568, 0, .12]], "sine", .08), 560); } catch (e) {} }
+document.addEventListener("pointerdown", () => { if (ST && !IS_OWNER) jingle(); }, { capture: true });
 /* the full-screen splash: wait so it is seen, then fade it away */
 function splashOff() { const el = document.getElementById("splash"); if (!el) return Promise.resolve();
   const t0 = window.__t0 || Date.now(); const wait = Math.max(0, 2000 - (Date.now() - t0));
   return new Promise(r => setTimeout(() => { el.classList.add("out"); setTimeout(() => { el.remove(); r(); }, 360); }, wait)); }
 (function () { const sp = document.getElementById("spBB"); if (sp) sp.innerHTML = bubbo("happy", 220, /theme-/.test(document.documentElement.className) ? null : "#FFFFFF", "act-wake"); })();
 /* color themes: picked in onboarding, changeable in Me */
-const THEMES = [["marker", "Marker", "#FFE24A", "#FFFFFF"], ["mint", "Mint", "#8CF0C8", "#FFFFFF"], ["coral", "Coral", "#FF8A6B", "#FFF9F4"], ["grape", "Grape", "#D9FF4A", "#F3EFFF"], ["stamp", "Stamp", "#FF4B3E", "#FBF8F2"]];
+const THEMES = [["marker", "Marker", "#FFE24A", "#FFFFFF"], ["mint", "Mint", "#8CF0C8", "#FFFFFF"], ["coral", "Coral", "#FF8A6B", "#FFF9F4"], ["grape", "Grape", "#B9A3FF", "#F3EFFF"], ["stamp", "Stamp", "#FF4B3E", "#FFFFFF"]];
 function applyTheme(t) { t = t || (ST && ST.settings && ST.settings.theme) || (() => { try { return localStorage.getItem("vb_theme"); } catch (e) { return ""; } })() || "marker";
   document.documentElement.className = document.documentElement.className.replace(/\btheme-\w+/g, "").trim() + (t === "marker" ? "" : " theme-" + t);
   try { localStorage.setItem("vb_theme", t); } catch (e) {} const mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.content = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#fff"; }
@@ -400,6 +403,7 @@ function setShell(kind) { // kind: tabs | focus | teacher | bare
   tabs.innerHTML = `<div class="tabbar"><nav>${t("today", "Today", I.home)}${t("map", "Map", I.map)}${t("words", "Words", I.cards)}${t("progress", "Progress", I.chart)}${t("me", "Me", I.me)}</nav></div>`;
 }
 function previewBar() { return IS_OWNER ? `<div class="notice info row between" style="margin-top:12px"><span>Student preview (test data)</span><button class="ghost" data-act="toTeacher">Dashboard</button></div>` : ""; }
+function scrollTop0() { try { window.scrollTo(0, 0); } catch (e) {} try { $app.scrollTo(0, 0); } catch (e) {} }
 function render() { renderInner(); drawGear(); fitWords(); try { mascotSync(); } catch (e) {} }
 function fitWords() { document.querySelectorAll("#app .word").forEach(el => { el.style.whiteSpace = "nowrap"; let fs = parseFloat(getComputedStyle(el).fontSize) || 46; let n = 0;
   while (el.scrollWidth > el.clientWidth + 1 && fs > 20 && n++ < 30) { fs -= 2; el.style.fontSize = fs + "px"; } }); }
@@ -514,7 +518,7 @@ function cardBody(e) {
   return `<div class="row between" style="align-items:flex-start;flex-wrap:wrap;row-gap:8px"><div style="min-width:0"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div><p class="ipa">${esc(e.ipa)}</p>${KO() && e.kr ? `<div style="margin-top:6px">${krBadge(e)}</div>` : ""}</div>
       <div class="row" style="flex-wrap:nowrap">${spk(e.id, "w")}${spk(e.id, "s", "Slow", "icon-l")}</div></div>
     <div class="stack" style="gap:10px">${e.senses.map(x => `<div class="sense"><span class="pos-tag">${esc(x.pos)}</span><div>${KO() ? `<p class="ko">${esc(x.ko)}</p>` : ""}<p class="def" ${KO() ? "" : 'style="font-size:19px;font-weight:700;color:var(--ink)"'}>${esc(x.def)}</p></div></div>`).join("")}</div>
-    <div class="stack" style="gap:8px"><p class="label">Syllables${e.syl.includes("·") ? " · tap to hear · dark = strongest" : ""}</p><div class="parts">${sylButtons(e)}</div></div>
+    <div class="stack" style="gap:8px"><p class="label">Syllables${e.syl.includes("·") ? " · tap to hear it slowly · dark = strongest" : ""}</p><div class="parts">${sylButtons(e)}</div></div>
     <div class="stack" style="gap:8px"><p class="label">Examples</p>${e.ex.map((x, k) => `<div class="ex">${spk(e.id, "e" + k)}<p>${exHtml(x, e.w)}</p></div>`).join("")}</div>`;
 }
 function renderWordCard() { const e = BY[view.id];
@@ -749,7 +753,7 @@ function trainTopbar(id) {
 function renderTrain() {
   const id = TR.queue[0]; const e = BY[id];
   const head = trainTopbar(id) + `<span class="eyebrow">${TR.reason === "missed" ? "⚡ Quick fix · missed words" : "Training"}${TR.seen[id] ? " · one more time" : ""}</span>`
-    + (!Object.keys(TR.seen).length && TR.step === "study" ? `<div class="notice info small">💾 You can stop any time. Words you finish are saved, so you can come back later.</div>` : "");
+    + (false ? `` : "");
   if (TR.step === "study") {
     $app.innerHTML = head + `<div class="card">${cardBody(e)}
       ${speakOn() && !TR.seen[id] ? `<button class="big primary icon-l" data-act="toSpeak">${ICON_MIC} I'm ready · say it out loud</button>` : `<button class="big primary" data-act="cover">I'm ready · cover &amp; write</button>`}</div>`;
@@ -1102,15 +1106,14 @@ function trainTap(more) {
 let PACK_PENDING = null;
 function packSheet(ids, reason) {
   PACK_PENDING = { ids, reason };
-  sheet(`<div style="font-size:52px;line-height:1">🧐</div><h2>${reason === "more" ? "Learn " + ids.length + " more words" : "Today's " + ids.length + " new word" + (ids.length === 1 ? "" : "s")}</h2>
-    <p style="font-weight:800;margin:0">Already know these?</p><p class="muted">Take a quick check first. Words you get right are skipped, so you only learn the new ones.</p>
+  const firstDay = reason === "intro" && !(ST.week.trained || []).length; // only the first time a new set is opened
+  if (!firstDay) return startTraining(ids, reason);
+  const n = ST.week.newIds.length;
+  sheet(`<div style="display:flex;justify-content:center">${bubbo("wow", 100)}</div><h2 style="margin:0">이번 주 새 단어 ${n}개!</h2><p class="muted" style="margin:0">오늘은 그중 <b>${ids.length}개</b>부터. 처음 보는 단어가 많으면 바로 시작하고, 아는 단어가 많으면 먼저 확인해 보자.</p>
     <div class="chips" style="justify-content:center">${ids.map(id => `<span class="chip">${esc(BY[id].w)}</span>`).join("")}</div>
-    <button class="big primary" data-act="packCheck">Quick check (${ids.length} question${ids.length === 1 ? "" : "s"})</button>
-    <button class="big" data-act="packLearn">Start learning</button>
-    <p class="muted small">💾 You can stop any time. Your progress is saved.</p>
-    ${reason === "intro" && !(ST.week.trained || []).length && canTestOut() ? `<div class="stack" style="gap:8px;border-top:2px dashed var(--line);padding-top:12px;width:100%"><b>Do this week's words look too easy? 🚀</b>
-      <div class="chips" style="justify-content:center">${ST.week.newIds.map(id => `<span class="chip small">${esc(BY[id].w)}</span>`).join("")}</div>
-      <p class="muted small">Take a quick quiz on them. Get 80% or more and you get a new, harder set.</p><button class="big" data-act="sheetTestOut">Test out for harder words</button></div>` : ""}`);
+    <button class="big primary" data-act="packLearn">바로 시작하기 →</button>
+    <button class="big" data-act="packCheck">아는 단어가 많아요 · 빠른 확인</button>
+    ${canTestOut() ? `<button class="ghost" data-act="sheetTestOut" style="font-size:13px">이번 주 단어가 다 너무 쉬워요? 더 어려운 단어 받기</button>` : ""}`);
 }
 function startPackCheck() {
   const pk = PACK_PENDING; closeSheet(); if (!pk) return;
@@ -1439,7 +1442,7 @@ function renderCoach() {
     <div class="chat" id="coachChat" style="flex:1;padding-bottom:${CO.typing ? 230 : 170}px">${chat.join("")}</div>
     <div class="stack coach-foot" style="gap:10px">${foot}</div>`;
   const ta = document.getElementById("coachText"); if (ta && CO.typing && ta.tagName === "TEXTAREA") ta.focus();
-  const n = chat.length; if (CO.chatN !== n) { CO.chatN = n; setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), 60); }
+  const n = chat.length; if (CO.chatN !== n) { CO.chatN = n; setTimeout(() => { const el = $app.classList.contains("focus") ? $app : window; el.scrollTo({ top: ($app.classList.contains("focus") ? $app.scrollHeight : document.body.scrollHeight), behavior: "smooth" }); }, 60); }
 }
 function coachNext() { CO.i++; CO.text = ""; CO.res = null; CO.err = ""; CO.sayOk = false; CO.sayTries = 0; CO.sayHeard = ""; CO.sayTarget = ""; CO.help = []; CO.chatN = 0;
   if (CO.i >= CO.ids.length) { ATT.end = Date.now(); const it = ATT.items.filter(i => i.t === "coach" && !i.noai); ATT.score = it.length ? it.filter(i => i.ok).length / it.length : 0; saveAttempt();
@@ -1627,14 +1630,14 @@ function renderStory() {
 }
 function storyPick(k) { const S = STORY; const q = S.data.parts[S.part].questions[S.qi]; S.picked = k; const ok = k === q.answer; if (ok) { S.right++; award(5, "story q"); } S.answers = (S.answers || []).concat([{ p: S.part, q: S.qi, k, ok }]); render(); }
 function storyNextQ() { const S = STORY; S.qi++; S.picked = null;
-  if (S.qi >= S.data.parts[S.part].questions.length) { S.step = "after"; S.qi = 0; window.scrollTo(0, 0); }
+  if (S.qi >= S.data.parts[S.part].questions.length) { S.step = "after"; S.qi = 0; scrollTop0(); }
   render(); }
 function storyNextPart() { const S = STORY; stopAudio(); paraToken++; if (!S.dictDone) S.dictDone = {};
   if (!S.dictDone[S.part] && speakOn()) { S.dictDone[S.part] = true; return storyAskDict(); }
   return storyAdvance(); }
 function storyAdvance() { const S = STORY; stopAudio(); paraToken++;
   ST.storyProg = { week: weekKey(), n: Math.max(S.part + 1, (ST.storyProg && ST.storyProg.week === weekKey() ? ST.storyProg.n : 0)), of: S.data.parts.length }; saveST();
-  if (S.part + 1 < S.data.parts.length) { S.part++; S.step = "read"; window.scrollTo(0, 0); return render(); }
+  if (S.part + 1 < S.data.parts.length) { S.part++; S.step = "read"; scrollTop0(); return render(); }
   S.step = "done";
   startAttempt("story", { n: S.total, title: S.data.title }); ATT.end = Date.now(); ATT.score = S.total ? S.right / S.total : 1; ATT.answers = S.answers; ATT.dictation = S.dictLog || []; ATT.reading = S.readLog || []; saveAttempt();
   if (!(ST.storyWeeks || []).includes(weekKey())) { ST.storyWeeks = (ST.storyWeeks || []).concat([weekKey()]).slice(-30); bumpStat("stories"); award(30, "story"); }
@@ -1706,22 +1709,24 @@ const SEC_TOURS = {
 };
 function maybeTour(key) { if (!ST || TI >= 0 || !ST.tourDone) return; if ((ST.seenTours || {})[key]) return; const steps = SEC_TOURS[key]; if (!steps) return;
   setTimeout(() => { if (TI >= 0) return; TSTEPS = steps.map(s => ({ sel: s[0], en: s[1], ko: s[2] })); TKEY = key; TI = 0; drawTour(); }, 500); }
-function startTour() { TAB = "today"; view = { name: "tabs" }; TSTEPS = TOUR; TKEY = "main"; render(); window.scrollTo(0, 0); TI = 0; setTimeout(drawTour, 150); }
+function startTour() { TAB = "today"; view = { name: "tabs" }; TSTEPS = TOUR; TKEY = "main"; render(); scrollTop0(); TI = 0; setTimeout(drawTour, 150); }
 function drawTour() {
   document.querySelectorAll(".tour").forEach(x => x.remove()); if (TI < 0 || TI >= TSTEPS.length) return;
   const st = TSTEPS[TI]; const t = document.querySelector(st.sel);
   if (!t) { TI++; return drawTour(); }
-  t.scrollIntoView({ block: "center", behavior: "instant" in document.documentElement.style ? "instant" : "auto" });
+  try { t.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) { t.scrollIntoView({ block: "center" }); }
   setTimeout(() => { const r = t.getBoundingClientRect(); const pad = 8; const ov = document.createElement("div"); ov.className = "tour";
     const below = r.top < innerHeight / 2;
     ov.innerHTML = `<div class="tour-hole" style="left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px"></div>
       <div class="tour-card" style="${below ? `top:${Math.min(innerHeight - 220, r.bottom + 16)}px` : `bottom:${Math.min(innerHeight - 220, innerHeight - r.top + 16)}px`}">
       <p class="eyebrow">${TI + 1} / ${TSTEPS.length}</p><p style="font-weight:800;font-size:17px">${esc(st.en)}</p>${KO() ? `<p class="muted">${esc(st.ko)}</p>` : ""}
       <div class="row between"><button class="ghost" data-act="tourEnd">Skip</button><div class="row">${TI ? `<button data-act="tourBack">Back</button>` : ""}<button class="primary" data-act="tourNext">${TI + 1 < TSTEPS.length ? "Next" : "Got it!"}</button></div></div></div>`;
-    document.body.appendChild(ov); }, 120);
+    document.body.appendChild(ov); }, 320);
 }
+// keep the spotlight on its target if the page moves under it (iOS address bar, late layout)
+["scroll", "resize"].forEach(ev => window.addEventListener(ev, () => { if (TI < 0) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel); const h = document.querySelector(".tour-hole"); if (!t || !h) return; const r = t.getBoundingClientRect(); h.style.left = (r.left - 8) + "px"; h.style.top = (r.top - 8) + "px"; h.style.width = (r.width + 16) + "px"; h.style.height = (r.height + 16) + "px"; }, { passive: true }));
 function tourEnd() { TI = -1; document.querySelectorAll(".tour").forEach(x => x.remove());
-  if (TKEY === "main") { if (!ST.tourDone) { ST.tourDone = today(); saveST(); } window.scrollTo(0, 0); }
+  if (TKEY === "main") { if (!ST.tourDone) { ST.tourDone = today(); saveST(); } scrollTop0(); }
   else { ST.seenTours = Object.assign({}, ST.seenTours, { [TKEY]: today() }); saveST(); }
   TSTEPS = TOUR; TKEY = "main"; }
 window.addEventListener("resize", () => { if (TI >= 0) drawTour(); });
@@ -2072,8 +2077,9 @@ function renderLevelResult() {
   <button class="big primary" data-act="levelDone">${next}</button>`;
 }
 function goalHtml(st) {
-  st = st || ST; const c = effCfg(st);
-  return `<div class="stack" style="gap:6px"><p>📚 Learn <b>${c.newPerWeek}</b> new words a week (<b>about ${Math.max(1, Math.ceil(c.newPerWeek / 5))} a day</b> for 5 days) + review <b>${c.reviewPerWeek}</b></p><p>✏️ Daily quiz on <b>5 or more</b> days</p>${st.goal ? `<p>⭐ Reach <b>${gradeWord(st.goal.g)}</b> by ${new Date(st.goal.by + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</p>` : ""}</div>`;
+  st = st || ST; const c = effCfg(st); const per = Math.max(1, Math.ceil(c.newPerWeek / 5));
+  const row = (n, t, sub) => `<div class="goal-row"><span class="goal-n">${n}</span><div><div class="goal-t">${t}</div>${sub ? `<div class="muted small">${sub}</div>` : ""}</div></div>`;
+  return `<div class="goal-rows">${row("01", `<b>${c.newPerWeek}</b> new words a week`, `about ${per} a day for 5 days, plus ${c.reviewPerWeek} review words`)}${row("02", `Daily quiz on <b>5 or more</b> days`, "keeps the streak alive")}${st.goal ? row("03", `Reach <b>${gradeWord(st.goal.g)}</b>`, `by ${new Date(st.goal.by + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}`) : ""}</div>`;
 }
 function levelCard() { // Me / Progress card
   const L = ST.level; if (!L) return "";
@@ -2135,6 +2141,8 @@ function maybeAskPush() {
   if (IS_OWNER || !ST || pushOn() || PUSHASK) return false;
   const perm = WW.pushPermission(); if (perm === "denied" || perm === "unsupported" || !WW.standalone()) return false;
   if (ST.pushAskDay === today()) return false;
+  if (ST.setupDone && Date.now() - ST.setupDone < 3 * 864e5) return false; // the setup wizard just asked; leave it for a few days
+  if (ST.pushAskDay && (Date.now() - new Date(ST.pushAskDay + "T12:00:00").getTime()) < 4 * 864e5) return false; // not every day: every 4 days at most
   ST.pushAskDay = today(); saveST(); PUSHASK = true;
   const el = document.createElement("div"); el.className = "cel"; el.id = "pushAsk";
   el.innerHTML = `<div class="cel-card"><div class="cel-icon">🔔</div><h2>Turn on reminders?</h2><p class="muted">Vocaboo can send a friendly reminder at 8am, 5pm and 8pm so you never lose your streak.</p>${KO() ? `<p class="muted small">알림을 켜면 연속 기록을 지키기 쉬워요!</p>` : ""}<button class="big primary" data-act="pushAskYes">Yes, remind me</button><button class="big" data-act="pushAskNo">Not now</button></div>`;
@@ -2375,7 +2383,7 @@ function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInte
   return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
 
 /* ---------- "new version" popup ---------- */
-const APP_VER = "a23c00eb61"; let VER_SNOOZE = 0;
+const APP_VER = "90210a7cef"; let VER_SNOOZE = 0;
 async function checkVersion() {
   if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
   try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
@@ -2391,12 +2399,11 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) chec
 function gradeInfoHtml() {
   const rows = [["K–2", "Kindergarten – 2nd grade", "초등 1–2학년 수준 (원어민)", "happy, jump, friend"], ["3–5", "3rd – 5th grade", "초등 3–5학년 수준", "explore, protect, journey"], ["6–8", "6th – 8th grade (middle school)", "초6 – 중2 수준", "analyze, contrast, essential"],
     ["9–12", "9th – 12th grade (high school)", "중3 – 고3 수준", "inevitable, ambiguous, scrutinize"], ["12+", "Beyond high school", "대학 이상", "ubiquitous, pragmatic"]];
-  return `<details class="card" style="cursor:pointer"><summary style="font-weight:800;font-size:18px">ℹ️ What do the numbers mean? · 숫자의 뜻</summary>
-    <p class="small">The number is a <b>US school grade</b>. It tells you which grade of American students knows about as many English words as you do. The decimal shows how far into that school year: <b>4.0</b> = start of 4th grade, <b>4.5</b> = middle of 4th grade.</p>
-    <p class="small muted">숫자는 <b>미국 학년</b>이에요. 미국 원어민 학생 몇 학년만큼 단어를 아는지 보여줘요. 소수점은 학년 중 어디쯤인지예요 (4.0 = 4학년 초, 4.5 = 4학년 중간).</p>
+  return `<details class="card" style="cursor:pointer"><summary style="font-weight:800;font-size:18px">What do the numbers mean? <span class="muted" style="font-weight:500">· 숫자의 뜻</span></summary>
+    <div class="goal-rows" style="margin-top:6px"><div class="goal-row"><span class="goal-n">4.5</span><div><div class="goal-t">A US school grade</div><div class="muted small">How many English words an American student of that grade knows. 미국 학년 기준 · 그 학년 원어민만큼 단어를 안다는 뜻</div></div></div>
+    <div class="goal-row"><span class="goal-n">.5</span><div><div class="goal-t">How far into the year</div><div class="muted small">4.0 = start of 4th grade, 4.5 = middle. 4.0 = 4학년 초, 4.5 = 4학년 중간</div></div></div></div>
     <table class="gtable"><tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}<br><span class="muted small">${r[2]}</span><br><span class="small" style="color:var(--violet)">e.g. ${r[3]}</span></td></tr>`).join("")}</tbody></table>
-    <p class="small">💡 For kids learning English as a second language, being a few grades below their age is normal. What matters is that the number goes up over time.</p>
-    <p class="small muted">영어를 외국어로 배우는 아이는 나이보다 몇 학년 낮게 나오는 게 보통이에요. 숫자가 꾸준히 올라가는 게 중요해요.</p></details>`; }
+    <p class="small" style="border-left:3px solid var(--accent);padding-left:10px">For kids learning English as a second language, a few grades below their age is normal. What matters is that the number goes up.<br><span class="muted">영어를 외국어로 배우는 아이는 나이보다 몇 학년 낮게 나오는 게 보통이에요. 꾸준히 올라가는 게 중요해요.</span></p></details>`; }
 
 /* ---------- family profiles (one parent login, several kids) ---------- */
 let FAM = null, FAMPIN = null, PARENT_OK = 0;
@@ -2465,7 +2472,7 @@ async function pinForgotGo() { const pw = (document.getElementById("pinPw") || {
   catch (e) { PIN_FLOW.err = "That password isn't right."; drawPin(); } }
 function pinDone() { PARENT_OK = Date.now(); const then = PIN_FLOW && PIN_FLOW.then; PIN_FLOW = null; const el = document.getElementById("pinPad"); if (el) el.remove();
   if (then === "signout") { WW.signOut().then(() => location.reload()); return; }
-  leaveActivity(); view = { name: "parent" }; PROG = null; window.scrollTo(0, 0); render(); }
+  leaveActivity(); view = { name: "parent" }; PROG = null; scrollTop0(); render(); }
 function renderParent() {
   if (!parentUnlocked()) { view = { name: "tabs" }; TAB = "me"; return render(); }
   if (!PROG) { $app.innerHTML = loaderHtml("Loading the parent report… 📊"); loadProgress().then(() => view.name === "parent" && render()).catch(() => { PROG = { atts: [], sess: [] }; render(); }); return; }
@@ -2856,9 +2863,9 @@ function weekHtml() {
   const top = o => Object.entries(o).sort((a, b) => b[1].n - a[1].n);
   const wcell = (id, right) => `<div class="wrow"><span><b>${esc(BY[id].w)}</b> <span class="muted small">${esc(gloss(BY[id]))}</span></span>${right}</div>`;
   const meanHtml = top(mean).slice(0, 12).map(([id, b]) => wcell(id, `<span class="pill bad">×${b.n}</span>`)).join("") || `<p class="muted small">No meaning mistakes 🎉</p>`;
-  const spellHtml = top(spell).slice(0, 12).map(([id, b]) => wcell(id, `<span class="stack" style="gap:2px;align-items:flex-end">${b.n ? `<span class="pill bad">×${b.n}</span>` : ""}${b.hints ? `<span class="pill sun">💡${b.hints}</span>` : ""}</span>`)
+  const spellHtml = top(spell).slice(0, 12).map(([id, b]) => wcell(id, `<span class="stack" style="gap:2px;align-items:flex-end">${b.n ? `<span class="pill bad">×${b.n}</span>` : ""}${b.hints ? `<span class="pill sun">hint${b.hints}</span>` : ""}</span>`)
     + (Object.keys(b.tries).length ? `<div class="tries">${Object.entries(b.tries).slice(0, 4).map(([t, c]) => `<span class="mono">${esc(t)}${c > 1 ? " ×" + c : ""}</span>`).join("")}</div>` : "")).join("") || `<p class="muted small">No spelling mistakes 🎉</p>`;
-  const sayHtml = Object.entries(S.sayBad).sort((a, b) => (b[1].n + b[1].skip) - (a[1].n + a[1].skip)).slice(0, 12).map(([id, b]) => wcell(id, `<span class="stack" style="gap:2px;align-items:flex-end">${b.n ? `<span class="pill bad">×${b.n}</span>` : ""}${b.skip ? `<span class="pill">⏭ ${b.skip}</span>` : ""}${b.silent ? `<span class="pill sun">🤫${b.silent}</span>` : ""}${b.spoke ? `<span class="pill">🗣️${b.spoke}</span>` : ""}</span>`)
+  const sayHtml = Object.entries(S.sayBad).sort((a, b) => (b[1].n + b[1].skip) - (a[1].n + a[1].skip)).slice(0, 12).map(([id, b]) => wcell(id, `<span class="stack" style="gap:2px;align-items:flex-end">${b.n ? `<span class="pill bad">×${b.n}</span>` : ""}${b.skip ? `<span class="pill bad">skipped ×${b.skip}</span>` : ""}${b.silent ? `<span class="pill">silent ×${b.silent}</span>` : ""}${b.spoke ? `<span class="pill">not understood ×${b.spoke}</span>` : ""}</span>`)
     + `<div class="tries">${b.heard.slice(-3).map(h => `<span>“${esc(h)}”</span>`).join("")}${Object.keys(b.skipped || {}).length ? `<span class="muted">skipped: ${esc(Object.keys(b.skipped).join(", "))}</span>` : ""}</div>`).join("") || `<p class="muted small">No speaking problems 🎉</p>`;
   // her own ratings, in three groups
   const rate = { bad: [], mid: [], good: [] }; Object.entries(S.ratings).forEach(([id, r]) => rate[r] && rate[r].push(id));
@@ -2871,7 +2878,7 @@ function weekHtml() {
   const worst = top(Object.fromEntries(Object.keys(Object.assign({}, mean, spell)).map(id => [id, { n: ((mean[id] || {}).n || 0) + ((spell[id] || {}).n || 0) }]))).slice(0, 3);
   if (worst.length && worst[0][1].n >= 2) tips.push(`🔁 Trickiest words: ${worst.map(([id, b]) => `<b>${esc(BY[id].w)}</b> (×${b.n})`).join(", ")}.`);
   if (silent >= 3) tips.push(`🎤 <b>${silent}</b> silent mic tries. Her microphone may not be picking up; check Sound &amp; microphone on her phone.`);
-  if (hintsN) tips.push(`💡 Used <b>${hintsN}</b> hint letter${hintsN === 1 ? "" : "s"} in spelling.`);
+  if (hintsN) tips.push(`hint Used <b>${hintsN}</b> hint letter${hintsN === 1 ? "" : "s"} in spelling.`);
   const fold = (title, n, inner) => `<details class="card"><summary><b>${title}</b>${n != null ? ` <span class="muted small">(${n})</span>` : ""}</summary><div class="stack" style="gap:10px;margin-top:10px">${inner}</div></details>`;
   return `<div class="row between"><div class="row" style="flex-wrap:nowrap"><button class="icon-btn" data-act="wkPrev" ${ix >= ks.length - 1 ? "disabled" : ""} aria-label="Previous week">${I.back}</button><b style="font-size:18px">${wkLabel(wk)}</b><button class="icon-btn" data-act="wkNext" ${ix <= 0 ? "disabled" : ""} aria-label="Next week">${I.chev}</button></div>
      <button data-act="copyReport">📋 Copy report</button></div>
@@ -2889,7 +2896,7 @@ function weekHtml() {
    </div>
    <div class="card"><h3>Skills</h3>${skillRows(items)}
      <details><summary class="muted small">Details by question type</summary><div class="stack" style="gap:6px;margin-top:8px">${["mc_ko", "hear_ko", "ctx_ko", "en_ko", "match", "mc_def", "ko_en", "def_en", "dict", "train", "say_en", "say", "saysent", "coach"].filter(t => S.byType[t]).map(t => `<div class="row between small"><span class="muted">${TYPE_NAME[t]}</span><span>${Math.round(S.byType[t].ok / S.byType[t].n * 100)}% · ${S.byType[t].ok}/${S.byType[t].n}${SPEAK.has(t) ? "" : ` · ${(S.byType[t].ms / S.byType[t].n / 1000).toFixed(1)}s`}</span></div>`).join("")}</div></details></div>
-   <div class="card"><h3>Words to work on</h3><p class="muted small">×N = times missed this week. Spelling shows what she typed. 💡 = hint letters used. Speaking: ⏭ skipped · 🤫 silent mic · 🗣️ spoke but not understood.</p>
+   <div class="card"><h3>Words to work on</h3><div class="key"><span><b class="pill bad">×3</b> missed 3 times this week</span><span><b class="pill bad">skipped</b> tapped past it</span><span><b class="pill">silent</b> mic heard nothing</span><span><b class="pill">not understood</b> spoke, no match</span><span><b class="pill sun">hint 2</b> hint letters used</span></div>
      <div class="grid3"><div class="wcol"><h4>📖 Meaning</h4>${meanHtml}</div><div class="wcol"><h4>✍️ Spelling</h4>${spellHtml}</div><div class="wcol"><h4>🗣️ Speaking</h4>${sayHtml}</div></div></div>
    <div class="card"><h3>How she feels about her words</h3><p class="muted small">Her own rating after each word in training (latest).</p>
      <div class="grid3">${[["bad", "😟 Needs more study"], ["mid", "😐 So-so"], ["good", "😊 Got it"]].map(([k, l]) => `<div class="wcol"><h4>${l} <span class="muted small">(${rate[k].length})</span></h4><div class="chips">${rate[k].map(id => `<span class="chip">${esc(BY[id].w)}</span>`).join("") || `<span class="muted small">–</span>`}</div></div>`).join("")}</div></div>
@@ -2900,11 +2907,11 @@ function weekHtml() {
 }
 function wordsHtml() {
   const st = T.data.st; const W = T.data.words; if (!st.week) return `<div class="card">The first week starts after her word check.</div>`;
-  const row = id => { const e = BY[id], w = W[id]; return `<tr><td><b>${esc(e.w)}</b>${(st.week.trained || []).includes(id) ? " 🌱" : ""} ${krBadge(e)}<br><span class="muted">${esc(e.ko)}</span></td><td>${w ? `${w.right}✓ ${w.wrong}✗` : "not seen"}</td><td>${w ? (w.box >= MASTER_BOX ? '<span class="pill good">mastered</span>' : `<span class="pill ${w.box ? "" : "bad"}">level ${w.box}/${MASTER_BOX}</span>`) : "–"}</td><td><button class="ghost" data-act="rmWord" data-id="${id}">Remove</button></td></tr>`; };
+  const row = id => { const e = BY[id], w = W[id]; return `<tr><td><b>${esc(e.w)}</b>${(st.week.trained || []).includes(id) ? ' <span class="pill sun" style="font-size:10px">learned</span>' : ""} ${krBadge(e)}<br><span class="muted">${esc(e.ko)}</span></td><td>${w ? `${w.right}✓ ${w.wrong}✗` : "not seen"}</td><td>${w ? (w.box >= MASTER_BOX ? '<span class="pill good">mastered</span>' : `<span class="pill ${w.box ? "" : "bad"}">level ${w.box}/${MASTER_BOX}</span>`) : "–"}</td><td><button class="ghost" data-act="rmWord" data-id="${id}">Remove</button></td></tr>`; };
   const sim = clone(st); buildWeek(sim, W, effCfg(st), true); const next = sim.week.newIds.map(id => BY[id].w + (BY[id].book === "G" ? "" : "*")); const c = effCfg(st);
   return `<p class="muted">Week of ${wkLabel(st.week.key)}. ${c.textbook ? `${c.tbNew} new textbook words (book order from Unit ${c.startUnit}) + ` : ""}${c.grNew} new words from the graded list${st.level ? ` (just above ${gradeWord(st.level.g)})` : ""}, plus ${c.reviewPerWeek} review words. Change this in Settings.</p>
    <div class="card"><div class="row" style="align-items:flex-end"><div class="field" style="flex:1;min-width:200px"><label for="addWord">Add a word to this week</label><input id="addWord" type="text" list="bankList" placeholder="Type a word from the books" autocomplete="off" autocapitalize="off"><datalist id="bankList">${BANK.map(e => `<option value="${esc(e.w)}">`).join("")}</datalist></div><button class="primary" data-act="addWord">Add</button><button data-act="release">Start next week now</button></div></div>
-   <div class="notice info small"><b>How to read this:</b> <b>3✓ 1✗</b> = times she answered this word right / wrong (all time: quizzes, training spelling, listening; speaking not counted). <b>Level 0–4</b> = memory level: it goes up 1 each time she gets the word right in a daily quiz and drops back to 0 when she misses it. Level 4 = <b>mastered</b>. 🌱 = learned in training this week.</div>
+   <div class="key"><span><b>3✓ 1✗</b> right / wrong, all time</span><span><b class="pill">level 2/4</b> memory level: +1 per correct daily quiz, back to 0 when missed, 4 = mastered</span><span><b class="pill sun">learned</b> trained this week</span></div>
    <div class="grid"><div class="card"><h3>New (${st.week.newIds.length})</h3><div class="tbl-wrap"><table><tbody>${st.week.newIds.map(row).join("")}</tbody></table></div></div>
    <div class="card"><h3>Review (${st.week.reviewIds.length})</h3><div class="tbl-wrap"><table><tbody>${st.week.reviewIds.map(row).join("")}</tbody></table></div></div></div>
    <div class="card"><h3>Coming next week</h3><div class="chips">${next.map(w => `<span class="chip">${esc(w)}</span>`).join("")}</div>${c.textbook ? `<p class="muted small">* = textbook word</p>` : ""}<p class="muted small">Word-check words still waiting for review: ${(st.reviewPool || []).length}</p></div>`;
@@ -2983,8 +2990,8 @@ document.addEventListener("click", async ev => {
   if (a === "reload") return location.reload();
   if (a === "menu") return openMenu();
   if (a === "menuClose") return closeMenu();
-  if (a === "menuHome") { closeMenu(); leaveActivity(); TAB = "today"; view = { name: studentHome() }; window.scrollTo(0, 0); return render(); }
-  if (a === "menuMe") { closeMenu(); leaveActivity(); TAB = "me"; view = { name: studentHome() }; window.scrollTo(0, 0); return render(); }
+  if (a === "menuHome") { closeMenu(); leaveActivity(); TAB = "today"; view = { name: studentHome() }; scrollTop0(); return render(); }
+  if (a === "menuMe") { closeMenu(); leaveActivity(); TAB = "me"; view = { name: studentHome() }; scrollTop0(); return render(); }
   if (a === "menuPush") { closeMenu(); return turnOnPush(); }
   if (a === "menuSignout" && FAMPIN && !parentUnlocked()) { closeMenu(); return openParent("signout"); }
   if (a === "menuSignout") { if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Tap again to sign out"; return; } closeMenu(); leaveActivity(); await WW.signOut(); return location.reload(); }
@@ -2999,7 +3006,7 @@ document.addEventListener("click", async ev => {
   if (a === "bossGo") return startBoss(+b.dataset.b);
   if (a === "toMap") { TAB = "map"; view = { name: "tabs" }; return render(); }
   if (a === "bossPractice") { const ids = (view.missed || []).slice(0, 10); return startTraining(ids, "free"); }
-  if (a === "sheetGo") { closeSheet(); if (b.dataset.go === "home") { TAB = "today"; view = { name: "tabs" }; window.scrollTo(0, 0); return render(); }
+  if (a === "sheetGo") { closeSheet(); if (b.dataset.go === "home") { TAB = "today"; view = { name: "tabs" }; scrollTop0(); return render(); }
     const ids = shuffle(weekWords(mapWeeks()[+b.dataset.i]).filter(id => BY[id])).slice(0, 10); return startTraining(ids, "free"); }
   if (a === "addKid") return addKid();
   if (a === "whoSignout") { if (FAMPIN && !parentUnlocked()) return openParent("signout"); await WW.signOut(); return location.reload(); }
@@ -3062,17 +3069,17 @@ document.addEventListener("click", async ev => {
   if (a === "skipLevel" && IS_OWNER) return startLevelTest(true);
   if (a === "ltPick") return levelAnswer(b.dataset.id);
   if (a === "ltIdk") return levelAnswer(null);
-  if (a === "levelDone" && view.fromHome) { TAB = view.back || "today"; view = { name: "tabs" }; window.scrollTo(0, 0); return render(); }
-  if (a === "levelDone" && !ST.setupDone && studentHome() === "tabs") { SU = 0; view = { name: "setup" }; window.scrollTo(0, 0); return render(); }
-  if (a === "levelDone") { TAB = "today"; view = { name: studentHome() }; window.scrollTo(0, 0); return render(); }
+  if (a === "levelDone" && view.fromHome) { TAB = view.back || "today"; view = { name: "tabs" }; scrollTop0(); return render(); }
+  if (a === "levelDone" && !ST.setupDone && studentHome() === "tabs") { SU = 0; view = { name: "setup" }; scrollTop0(); return render(); }
+  if (a === "levelDone") { TAB = "today"; view = { name: studentHome() }; scrollTop0(); return render(); }
   if (a === "suNext") { SU++; OB_DIR = 1; render(); return mascotNext(); }
   if (a === "suBack") { SU--; OB_DIR = -1; return render(); }
   if (a === "suWords") return suWords(+b.dataset.v);
-  if (a === "suDone") { ST.setupDone = Date.now(); saveST(); TAB = "today"; view = { name: "tabs" }; window.scrollTo(0, 0); return render(); }
+  if (a === "suDone") { ST.setupDone = Date.now(); saveST(); TAB = "today"; view = { name: "tabs" }; scrollTop0(); return render(); }
   if (a === "levelAgain") { ST.levelRetake = true; view = { name: "levelIntro" }; return render(); }
   if (a === "signout") { await WW.signOut(); return location.reload(); }
-  if (a === "tabgo") { TAB = b.dataset.tab; if (TAB === "progress") PROG = null; view = { name: "tabs" }; window.scrollTo(0, 0); render(); if (TAB !== "today") maybeTour(TAB === "progress" ? "progress" : TAB); return; }
-  if (a === "home") { TAB = "today"; view = { name: "tabs" }; window.scrollTo(0, 0); return render(); }
+  if (a === "tabgo") { TAB = b.dataset.tab; if (TAB === "progress") PROG = null; view = { name: "tabs" }; scrollTop0(); render(); if (TAB !== "today") maybeTour(TAB === "progress" ? "progress" : TAB); return; }
+  if (a === "home") { TAB = "today"; view = { name: "tabs" }; scrollTop0(); return render(); }
   if (a === "range") { PROG_RANGE = b.dataset.r; return render(); }
   if (a === "openWord") { view = { name: "wordCard", id: b.dataset.id, back: TAB }; render(); await loadPacksFor([b.dataset.id]); speak(b.dataset.id, "w"); return; }
   if (a === "closeWord") { view = { name: "tabs" }; return render(); }
@@ -3108,7 +3115,7 @@ document.addEventListener("click", async ev => {
   if (a === "sword") { const e = BY[b.dataset.id]; speak(e.id, "w"); toast(e.w + ": " + e.def + (KO() && STORY && STORY.step === "after" ? " (" + senseList(e).map(s => s.ko).join(" / ") + ")" : "")); return; }
   if (a === "readPara") return readPara(+b.dataset.i);
   if (a === "toggleKo") { STORY.showKo[b.dataset.i] = !STORY.showKo[b.dataset.i]; return render(); }
-  if (a === "storyQs") { stopAudio(); STORY.step = "q"; window.scrollTo(0, 0); return render(); }
+  if (a === "storyQs") { stopAudio(); STORY.step = "q"; scrollTop0(); return render(); }
   if (a === "storyBack") { STORY.step = "read"; return render(); }
   if (a === "storyPick") return storyPick(+b.dataset.k);
   if (a === "storyNextQ") return storyNextQ();
@@ -3162,12 +3169,12 @@ document.addEventListener("click", async ev => {
   if (a === "flStart") return startFlash(b.dataset.deck);
   if (a === "flFlip") return flFlip();
   if (a === "flRate") return flRate(b.dataset.r);
-  if (a === "flHome") { stopAudio(); FL = null; TAB = "words"; view = { name: "tabs" }; window.scrollTo(0, 0); return render(); }
+  if (a === "flHome") { stopAudio(); FL = null; TAB = "words"; view = { name: "tabs" }; scrollTop0(); return render(); }
   if (a === "moreYes") { closeDayDone(); return trainTap(true); }
-  if (a === "moreNo") { closeDayDone(); TAB = "today"; view = { name: "tabs" }; window.scrollTo(0, 0); render(); setTimeout(checkBadges, 400); return; }
+  if (a === "moreNo") { closeDayDone(); TAB = "today"; view = { name: "tabs" }; scrollTop0(); render(); setTimeout(checkBadges, 400); return; }
   if (a === "liNext") { LIS++; return render(); }
   if (a === "liBack") { LIS--; return render(); }
-  if (a === "showGrade") { if (!ST.level) return; view = { name: "levelResult", fromHome: true, back: TAB }; window.scrollTo(0, 0); return render(); }
+  if (a === "showGrade") { if (!ST.level) return; view = { name: "levelResult", fromHome: true, back: TAB }; scrollTop0(); return render(); }
   if (a === "trainNext") return trainNext();
   if (a === "rate") return trainNext(b.dataset.r);
   if (a === "quit") { leaveActivity(); view = { name: studentHome() }; return render(); }
@@ -3177,8 +3184,8 @@ document.addEventListener("click", async ev => {
   if (a === "refresh") { $app.innerHTML = loaderHtml("Refreshing… 🔄"); await loadTeacher(); toast("Updated"); return; }
   if (a === "ttab") { T.tab = b.dataset.tab; return render(); }
   if (a === "wkPrev" || a === "wkNext") { const ks = weekOptions(); const i = ks.indexOf(T.week) + (a === "wkPrev" ? 1 : -1); if (ks[i]) T.week = ks[i]; return render(); }
-  if (a === "selStudent" || a === "openStudent") { T.sel = b.dataset.id; T.week = null; T.view = "student"; if (T.tab === "global") T.tab = "week"; $app.innerHTML = loaderHtml("Opening folder… 📂"); await loadStudentData(T.sel); window.scrollTo(0, 0); return render(); }
-  if (a === "tBackList") { T.view = "list"; T.data = null; if (T.tab === "global") T.tab = "week"; window.scrollTo(0, 0); return render(); }
+  if (a === "selStudent" || a === "openStudent") { T.sel = b.dataset.id; T.week = null; T.view = "student"; if (T.tab === "global") T.tab = "week"; $app.innerHTML = loaderHtml("Opening folder… 📂"); await loadStudentData(T.sel); scrollTop0(); return render(); }
+  if (a === "tBackList") { T.view = "list"; T.data = null; if (T.tab === "global") T.tab = "week"; scrollTop0(); return render(); }
   if (a === "tGlobal") { T.view = "list"; T.tab = "global"; return render(); }
   if (a === "copyReport") { const txt = reportText(); try { await navigator.clipboard.writeText(txt); toast("Report copied. Paste it to Claude to make the test"); } catch (e) { showReportText(txt); } return; }
   if (a === "saveCfg") return saveCfg();
