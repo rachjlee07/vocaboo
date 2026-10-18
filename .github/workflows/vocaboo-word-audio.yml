@@ -1,0 +1,66 @@
+name: Vocaboo word audio
+# Records every word and example sentence in the natural Bella voice and saves them into app/audio.
+# Start it by hand: Actions -> Vocaboo word audio -> Run workflow. Takes about 30-60 minutes.
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Get the voice model
+        id: model
+        uses: actions/cache@v4
+        with:
+          path: tts/kokoro.onnx
+          key: kokoro-q8-1.0.0
+      - name: Download the voice model
+        if: steps.model.outputs.cache-hit != 'true'
+        run: |
+          cd tts
+          npm pack kokoro-q8-shards@1.0.0 --silent
+          tar xzf kokoro-q8-shards-1.0.0.tgz
+          cat package/kokoro-q8.part*.bin > kokoro.onnx
+          rm -rf package kokoro-q8-shards-1.0.0.tgz
+      - name: Record
+        run: |
+          pip install -q kokoro-onnx==0.6.1 phonemizer==3.4.0 espeakng-loader==0.2.4 lameenc==1.9.0 numpy
+          python tts/word_audio.py part ${{ matrix.part }} 10
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part-${{ matrix.part }}
+          path: out_part_${{ matrix.part }}.json
+          retention-days: 2
+  save:
+    needs: record
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          path: parts
+          merge-multiple: true
+      - name: Put the recordings into the app
+        run: python tts/word_audio.py merge
+      - name: Save
+        run: |
+          git config user.name "vocaboo-bot"
+          git config user.email "vocaboo-bot@users.noreply.github.com"
+          git add app/audio
+          git commit -m "Add Bella recordings for words and sentences" || echo "nothing new"
+          for i in 1 2 3; do git pull --rebase && git push && break; sleep 5; done
