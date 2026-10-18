@@ -1,6 +1,6 @@
 // Connects the app to Firebase (login + database). Nothing to edit here; settings live in config.js.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, signOut, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, persistentLocalCache, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const C = window.WW_CONFIG || {};
@@ -69,7 +69,7 @@ window.WW = {
   db: { doc: docRef, collection: collRef, batch: async ops => { const b = writeBatch(fs); ops.forEach(o => o.type === "update" ? b.update(doc(fs, o.path), o.data) : b.set(doc(fs, o.path), o.data)); await b.commit(); } },
   teacherUid: String(C.teacherUid || "").trim(),
   user: () => current,
-  signIn: async (email, pw) => { await setPersistence(auth, browserLocalPersistence); return signInWithEmailAndPassword(auth, email.trim(), pw); },
+  signIn: async (email, pw, remember) => { await setPersistence(auth, remember === false ? browserSessionPersistence : browserLocalPersistence); return signInWithEmailAndPassword(auth, email.trim(), pw); },
   signUp: async (email, pw) => { await setPersistence(auth, browserLocalPersistence); return createUserWithEmailAndPassword(auth, email.trim(), pw); },
   resetPassword: email => sendPasswordResetEmail(auth, email.trim()),
   reauth: pw => reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, pw)),
