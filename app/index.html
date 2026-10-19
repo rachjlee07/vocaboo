@@ -561,6 +561,41 @@ mark{text-decoration-color:var(--accent)}
 .course-pill i{width:12px;height:12px;border-radius:4px;background:var(--cc);flex:none}
 .course-pill span{margin-left:auto;opacity:.5}
 .ko .hlx{background:linear-gradient(transparent 58%,var(--accent) 58%,var(--accent) 92%,transparent 92%);-webkit-box-decoration-break:clone;box-decoration-break:clone;padding:0 2px}
+
+/* v27d: course picker */
+.bk-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.bk{position:relative;aspect-ratio:3/4;border:0;border-radius:6px 16px 16px 6px;background:var(--c);color:#fff;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:10px 10px 10px 16px;text-align:left;box-shadow:inset 7px 0 0 rgba(0,0,0,.18),inset 9px 0 0 rgba(255,255,255,.18),0 6px 14px -8px rgba(0,0,0,.45);transition:transform .15s}
+.bk:active{transform:scale(.96)}
+.bk-name{font-family:var(--f-display);font-size:17px;font-weight:800;line-height:1.05}
+.bk-sub{font-size:11px;font-weight:700;opacity:.85;margin-top:2px}
+.bk.on{outline:3px solid var(--ink);outline-offset:3px}
+.bk-ck{position:absolute;top:7px;right:7px;width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center}
+.pk-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pk{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:14px;border-radius:20px;border:1.5px solid color-mix(in srgb,var(--c) 22%,transparent);background:color-mix(in srgb,var(--c) 9%,#fff);color:var(--ink);transition:transform .15s}
+.pk:active{transform:scale(.97)}
+.pk b{font-size:16px}
+.pk-sub{font-size:12px;line-height:1.35;color:var(--muted,#6b6880)}
+.pk-ic{width:44px;height:44px;border-radius:14px;background:var(--c);color:#fff;display:grid;place-items:center;flex:none}
+.pk.on{border-color:var(--ink);box-shadow:0 0 0 1.5px var(--ink)}
+.kd{position:relative;display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:14px;border-radius:20px;border:1.5px solid var(--line);background:#fff;color:var(--ink)}
+.kd-ic{width:44px;height:44px;border-radius:14px;background:var(--soft);display:grid;place-items:center;flex:none}
+.kd-t{display:flex;flex-direction:column;gap:2px}.kd-t b{font-size:17px}.kd-t span{font-size:13px;color:var(--muted,#6b6880)}
+.kd.on{border-color:var(--ink);box-shadow:0 0 0 1.5px var(--ink)}.kd.on .kd-ic{background:var(--ink);color:#fff}
+.kd .bk-ck{top:50%;transform:translateY(-50%);right:14px}
+.cp-sec{display:flex;align-items:baseline;gap:8px;margin-top:8px}.cp-sec h3{margin:0}
+.ugrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;width:100%}
+.ustop{position:relative;aspect-ratio:1;border-radius:50%;border:2px solid color-mix(in srgb,var(--c) 35%,transparent);background:#fff;font-family:var(--f-display);font-weight:800;font-size:17px;color:var(--ink);padding:0}
+.ustop.past{background:color-mix(in srgb,var(--c) 14%,#fff);border-color:transparent;color:color-mix(in srgb,var(--c) 70%,#000)}
+.ustop.on{background:var(--c);border-color:var(--c);color:#fff;box-shadow:0 4px 0 color-mix(in srgb,var(--c) 70%,#000)}
+.ustop i{position:absolute;bottom:-3px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--ink)}
+.ustack{display:flex;flex-direction:column;gap:8px}
+.ulist{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;border:1.5px solid var(--line);background:#fff;text-align:left;color:var(--ink)}
+.ulist .unum{width:30px;height:30px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:800;flex:none}
+.ulist.on{border-color:var(--c);box-shadow:0 0 0 1.5px var(--c)}.ulist.on .unum{background:var(--c);color:#fff}
+.unow{margin-left:auto;font-size:12px;font-weight:800;color:var(--c)}
+.cp-head{display:flex;align-items:center;gap:14px}
+.cp-book{width:40px;height:54px;border-radius:4px 10px 10px 4px;background:var(--c);box-shadow:inset 5px 0 0 rgba(0,0,0,.18);flex:none}
+.pk-grid.compact .pk-sub{display:none}.pk-grid.compact .pk{flex-direction:row;align-items:center;padding:12px}
 </style>
 </head>
 <body>
@@ -574,7 +609,7 @@ mark{text-decoration-color:var(--accent)}
 <script src="words.js?v=d28539be18"></script>
 <script src="courses.js?v=3b8a60c1a1"></script>
 <script src="stories.js?v=453278059e"></script>
-<script src="app.js?v=a8658f6103"></script>
+<script src="app.js?v=56edcca7fa"></script>
 <script type="module" src="fb.js?v=64ffe6dd4f"></script>
 </body>
 </html>

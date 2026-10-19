@@ -487,8 +487,8 @@ function bubboSays() { // one line from Bubbo for the Today screen, different ea
 }
 function renderToday() {
   saveStars(); const s = streakNow(); const wk = ST.week; const ids = weekIds();
-  const P = packInfo(); const needIntro = !!P && !quizReady() && !IS_OWNER; const locked = ST.lock && ST.lock.on && !IS_OWNER; const qd = quizDoneToday();
-  const storyLock = !!P && !storyReady() && !IS_OWNER; const mastered = ids.filter(isMastered).length;
+  const P = packInfo(); const needIntro = !!P && !quizReady(); const locked = ST.lock && ST.lock.on; /* the teacher's preview follows the same rules as a student */ const qd = quizDoneToday();
+  const storyLock = !!P && !storyReady(); const mastered = ids.filter(isMastered).length;
   const cd = ST.coachDay === today(); const cT = coachTarget(); const coachN = cd ? cT : (ST.coachProg && ST.coachProg.day === today() ? Math.min(cT, ST.coachProg.n) : 0);
   const sd = (ST.storyWeeks || []).includes(weekKey()); const sp = ST.storyProg && ST.storyProg.week === weekKey() ? ST.storyProg : null;
   const dueN = P ? P.due : 0; const weekend = P && !P.studyDay; const say = bubboSays();
@@ -1772,7 +1772,8 @@ function drawTour() {
 }
 // while the tour is up, only the spotlighted thing and the tour card can be tapped
 document.addEventListener("click", ev => { if (TI < 0 || !document.querySelector(".tour")) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel);
-  if (ev.target.closest(".tour-card") || (t && t.contains(ev.target))) return; ev.preventDefault(); ev.stopImmediatePropagation(); }, true);
+  if (ev.target.closest(".tour-card") || (t && t.contains(ev.target))) return; ev.preventDefault(); ev.stopImmediatePropagation();
+  const h = document.querySelector(".tour-hole"); if (t && h && ev.isTrusted) { const r = h.getBoundingClientRect(); if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) setTimeout(() => t.click(), 0); } }, true); // a tap inside the spotlight always reaches the real button
 // keep the spotlight on its target if the page moves under it (iOS address bar, late layout)
 ["scroll", "resize"].forEach(ev => window.addEventListener(ev, () => { if (TI < 0) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel); const h = document.querySelector(".tour-hole"); if (!t || !h) return; const r = viewRect(t); h.style.left = (r.left - 8) + "px"; h.style.top = (r.top - 8) + "px"; h.style.width = (r.width + 16) + "px"; h.style.height = (r.height + 16) + "px"; }, { passive: true }));
 function tourEnd() { TI = -1; document.querySelectorAll(".tour").forEach(x => x.remove());
@@ -2445,7 +2446,7 @@ function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInte
   return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
 
 /* ---------- "new version" popup ---------- */
-const APP_VER = "09e598eb92"; let VER_SNOOZE = 0;
+const APP_VER = "6d10fad27f"; let VER_SNOOZE = 0;
 async function checkVersion() {
   if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
   try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
@@ -2776,25 +2777,44 @@ function courseCard() {
     <p class="muted small" style="margin:0">${info ? esc(courseLabel(c)) + (c.by === "teacher" ? TL(" · 선생님이 정해 줬어요", " · set by your teacher") : "") : TL("내 수준에 맞는 단어를 골라 줘요.", "Words picked for your level.")}</p>
     <button class="big" data-act="coursePick">${TL("코스 바꾸기", "Change course")}</button></div>`;
 }
+/* visual pieces: workbooks look like books, packs get a drawn icon, units are numbered stops */
+const PK_IC = {
+  travel: '<path d="M2.5 13.5 21 6l-4.5 15-4-6.5-6-1z"/><path d="M12.5 14.5 21 6"/>',
+  business: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18"/>',
+  kitchen: '<path d="M4 10h16v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M2 10h20M9 6.5c0-1.5 1-1.5 1-3M13 6.5c0-1.5 1-1.5 1-3"/>',
+  shopping: '<path d="M5 8h14l-1 12H6z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/>',
+  health: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/><path d="M8 12h2.5l1-2 1.5 4 1-2H16"/>',
+  feelings: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.2a4.5 4.5 0 0 0 7 0"/><path d="M9.2 9.8h.01M14.8 9.8h.01" stroke-width="2.6"/>' };
+const pkIcon = id => `<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${PK_IC[id] || PK_IC.travel}</svg>`;
+const CK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
+function bookTile(L, on, act) { return `<button class="bk ${on ? "on" : ""}" data-act="${act}" data-v="${L.id}" style="--c:${L.color}" aria-pressed="${!!on}"><span class="bk-name">${esc(L.name)}</span><span class="bk-sub">${L.units.length} units</span>${on ? `<span class="bk-ck">${CK}</span>` : ""}</button>`; }
+function packTile(p, on, act) { return `<button class="pk ${on ? "on" : ""}" data-act="${act}" data-v="${p.id}" style="--c:${TH_COLOR[p.id] || "#3F82F2"}" aria-pressed="${!!on}"><span class="pk-ic">${pkIcon(p.id)}</span><b>${esc(TL(p.ko, p.name))}</b><span class="pk-sub">${p.units.map(u => esc(TL(u.ko, u.name))).join(" · ")}</span>${on ? `<span class="bk-ck">${CK}</span>` : ""}</button>`; }
+function kindTile(k, on, act, title, sub, icon) { return `<button class="kd ${on ? "on" : ""}" data-act="${act}" data-v="${k}" aria-pressed="${!!on}"><span class="kd-ic">${icon}</span><span class="kd-t"><b>${title}</b><span>${sub}</span></span>${on ? `<span class="bk-ck">${CK}</span>` : ""}</button>`; }
+const KD_IC = { grade: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V14M10 20V9M16 20V12M22 20V5"/></svg>',
+  wb: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/></svg>',
+  th: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>' };
+function unitStops(info, sel, cur, act, numbered) {
+  if (!numbered) return `<div class="ustack">${info.units.map((u, i) => `<button class="ulist ${sel === i + 1 ? "on" : ""}" data-act="${act}" data-u="${i + 1}" style="--c:${info.color}"><span class="unum">${i + 1}</span><b>${esc(info.unitName(i))}</b>${cur === i + 1 ? `<span class="unow">${TL("지금", "Now")}</span>` : ""}</button>`).join("")}</div>`;
+  return `<div class="ugrid">${info.units.map((u, i) => `<button class="ustop ${sel === i + 1 ? "on" : ""} ${i + 1 < sel ? "past" : ""}" data-act="${act}" data-u="${i + 1}" style="--c:${info.color}" aria-label="Unit ${i + 1}">${i + 1}${cur === i + 1 ? "<i></i>" : ""}</button>`).join("")}</div>`; }
 function renderCoursePick() {
   const c = ST.course || {}; const head = `<div class="row between" style="padding-top:14px"><button class="ghost" data-act="${CP.level || CP.pack ? "cpBack" : "cpClose"}" aria-label="Back" style="min-height:40px">‹ ${TL("뒤로", "Back")}</button><span></span></div>`;
-  const row = (act, attrs, title, sub, color, on) => `<button class="goal" data-act="${act}" ${attrs} aria-pressed="${!!on}" style="min-height:70px">${color ? `<i style="width:14px;height:44px;border-radius:7px;background:${color};flex:none"></i>` : ""}<span style="flex:1;text-align:left"><b>${title}</b><br><span class="muted small">${sub}</span></span><span class="ck"></span></button>`;
   let body = "";
   if (CP.level || CP.pack) { // unit picker
     const info = courseInfo(CP.level ? { type: "wb", book: CP.book, level: CP.level } : { type: "th", pack: CP.pack });
     const cur = (CP.level ? c.type === "wb" && c.level === CP.level : c.type === "th" && c.pack === CP.pack) ? c.unit : 0;
     const sel = CP.unit || cur || 1; const ids = info.units[sel - 1] || [];
-    body = `<h1 style="margin:4px 0 0">${esc(info.title)}</h1><p class="muted">${TL("유닛을 골라 줘. 일주일에 한 유닛씩 배워요.", "Pick a unit. You learn one unit a week.")}</p>
-      <div style="display:grid;grid-template-columns:repeat(${CP.level ? 6 : 1},minmax(0,1fr));gap:8px">${info.units.map((u, i) => `<button class="opt ${sel === i + 1 ? "sel" : ""}" data-act="cpUnit" data-u="${i + 1}" style="min-height:48px;${CP.level ? "padding:0" : ""}${sel === i + 1 ? `;border-color:${info.color};background:${info.color};color:#fff` : ""}">${CP.level ? i + 1 : esc(info.unitName(i))}${cur === i + 1 ? " •" : ""}</button>`).join("")}</div>
-      <div class="card" style="gap:8px"><b>${esc(info.unitName(sel - 1))} · ${ids.length} ${TL("단어", "words")}</b><div class="chips">${ids.map(id => BY[id] ? `<span class="chip">${esc(BY[id].w)}</span>` : "").join("")}</div></div>
-      ${CP.level && sel > 1 ? `<p class="muted small" style="margin:0">${TL(`Unit 1–${sel - 1} 단어는 복습으로 조금씩 나와요.`, `Words from Units 1–${sel - 1} come back as review.`)}</p>` : ""}<button class="big primary" data-act="cpGo">${TL("이 유닛으로 시작", "Start this unit")}</button>${CP.level ? `<p class="muted small">${TL("이 코스의 뜻풀이와 예문은 Vocaboo가 직접 만들었어요. 출판사와는 관계가 없어요.", "Meanings and sentences are written by Vocaboo. Not affiliated with the publisher.")}</p>` : ""}`;
+    body = `<div class="cp-head" style="--c:${info.color}">${CP.level ? `<span class="cp-book"></span>` : `<span class="pk-ic" style="--c:${info.color}">${pkIcon(CP.pack)}</span>`}<div><h1 style="margin:0">${esc(info.title)}</h1><p class="muted small" style="margin:2px 0 0">${TL("일주일에 한 유닛씩 배워요", "One unit a week")}</p></div></div>
+      <p class="label" style="margin:6px 0 0">${TL("어느 유닛부터 할까?", "Start from which unit?")}</p>${unitStops(info, sel, cur, "cpUnit", !!CP.level)}
+      <div class="card" style="gap:8px"><b>${esc(info.unitName(sel - 1))} · ${ids.length} ${TL("단어", "words")}</b><div class="chips">${ids.map(id => BY[id] ? `<span class="chip">${esc(BY[id].w)}</span>` : "").join("")}</div>
+      ${CP.level && sel > 1 ? `<p class="muted small" style="margin:0">${TL(`Unit 1–${sel - 1} 단어는 복습으로 조금씩 나와요.`, `Words from Units 1–${sel - 1} come back as review.`)}</p>` : ""}</div>
+      <button class="big primary" data-act="cpGo">${TL("이 유닛으로 시작", "Start this unit")}</button>${CP.level ? `<p class="muted small" style="text-align:center">${TL("뜻풀이와 예문은 Vocaboo가 직접 만들었어요. 출판사와는 관계가 없어요.", "Meanings and sentences are written by Vocaboo. Not affiliated with the publisher.")}</p>` : ""}`;
   } else {
     const b = CX.books[0];
     body = `<h1 style="margin:4px 0 0">${TL("어떤 단어를 배울까?", "What do you want to learn?")}</h1>
-      <div class="goals">${row("cpGrade", "", TL("내 수준에 맞게", "Words for my level"), TL("레벨 테스트 결과에 맞춰 골라 줘요", "Picked from your level test"), "", !ST.course)}</div>
-      ${wbVisible() && b ? `<h3 style="margin:10px 0 0">${TL("워크북 코스", "Workbook courses")}</h3><p class="muted small" style="margin:0">${esc(b.name)}</p><div class="goals">${b.levels.map(L => row("cpLevel", `data-v="${L.id}"`, L.name, `${L.units.length} units · ${L.units[0].length} ${TL("단어씩", "words each")}`, L.color, c.type === "wb" && c.level === L.id)).join("")}</div>` : ""}
-      <h3 style="margin:10px 0 0">${TL("테마 팩", "Theme packs")}</h3><p class="muted small" style="margin:0">${TL("여행, 비즈니스, 생활 영어 · 무료", "Travel, business, everyday English · free")}</p>
-      <div class="goals">${CX.themes.map(p => row("cpPack", `data-v="${p.id}"`, TL(p.ko, p.name), p.units.map(u => TL(u.ko, u.name)).join(" · "), TH_COLOR[p.id], c.type === "th" && c.pack === p.id)).join("")}</div>`;
+      ${kindTile("grade", !ST.course, "cpGrade", TL("내 수준에 맞게", "Words for my level"), TL("레벨 테스트 결과로 골라 줘요", "Picked from your level test"), KD_IC.grade)}
+      ${wbVisible() && b ? `<div class="cp-sec"><h3>${TL("워크북", "Workbooks")}</h3><span class="muted small">${esc(b.name)}</span></div><div class="bk-row">${b.levels.map(L => bookTile(L, c.type === "wb" && c.level === L.id, "cpLevel")).join("")}</div>` : ""}
+      <div class="cp-sec"><h3>${TL("테마 팩", "Theme packs")}</h3><span class="muted small">${TL("무료", "Free")}</span></div>
+      <div class="pk-grid">${CX.themes.map(p => packTile(p, c.type === "th" && c.pack === p.id, "cpPack")).join("")}</div>`;
   }
   $app.innerHTML = head + `<div class="stack" style="gap:12px;padding-bottom:30px">${body}</div>`;
 }
@@ -2809,7 +2829,8 @@ async function courseAct(a, b) {
   if (a === "cpGo") { const c = CP.level ? { type: "wb", book: CP.book, level: CP.level } : { type: "th", pack: CP.pack }; const info = courseInfo(c);
     const cur = ST.course && (ST.course.level || ST.course.pack) === (c.level || c.pack) ? ST.course.unit : 0; c.unit = CP.unit || cur || 1;
     setCourse(c); try { sfx("win"); } catch (e) {} toast(TL(`${info.short} ${info.unitName(c.unit - 1)} 시작!`, `Starting ${info.short} ${info.unitName(c.unit - 1)}!`)); view = { name: studentHome() }; TAB = "today"; scrollTop0(); render(); return true; }
-  if (a === "suCourse") { ST._suCourse = b.dataset.v; OB_DIR = 0; render(); return true; }
+  if (a === "suCourse") { ST._suCourse = b.dataset.v; if (b.dataset.v === "pick") { delete ST._suLevel; delete ST._suUnit; } OB_DIR = 0; render(); return true; }
+  if (a === "suUnitPick") { ST._suUnit = +b.dataset.u; OB_DIR = 0; render(); return true; }
   if (a === "suLevel") { if (ST._suLevel !== b.dataset.v) delete ST._suUnit; ST._suLevel = b.dataset.v; OB_DIR = 0; render(); return true; }
   if (a === "tw") { twShow(b); return true; }
   if (a === "tiAdd" || a === "tiDel") { tileTap(a, +b.dataset.i); return true; }
@@ -2824,12 +2845,15 @@ async function courseAct(a, b) {
 /* setup wizard step: what to learn */
 function suCourseStep() {
   const adult = !!(ST.profile && ST.profile.adult); const v = ST._suCourse || (ST.course ? (ST.course.type === "wb" ? "wb" : "th") : (adult ? "" : "grade"));
-  const opt = (k, t, s) => `<button class="goal" data-act="suCourse" data-v="${k}" aria-pressed="${v === k}" style="min-height:70px"><span style="flex:1;text-align:left"><b>${t}</b><br><span class="muted small">${s}</span></span><span class="ck"></span></button>`;
   let more = "";
-  if (v === "wb") { const b = CX.books[0]; more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${b.levels.map(L => `<button class="opt ${ST._suLevel === L.id ? "sel" : ""}" data-act="suLevel" data-v="${L.id}" style="min-height:52px;${ST._suLevel === L.id ? `background:${L.color};color:#fff;border-color:${L.color}` : `border-left:8px solid ${L.color}`}">${L.name}</button>`).join("")}</div>${ST._suLevel ? (() => { const L = b.levels.find(x => x.id === ST._suLevel); const u = ST._suUnit || 1; return `<div class="field" style="width:100%;margin-top:4px"><label for="suUnit">${TL("어느 유닛부터 시작할까?", "Which unit do you start with?")}</label><select id="suUnit" data-change="suUnit" style="min-height:52px;border-radius:14px;border:2px solid var(--line);padding:0 10px;font:inherit;font-size:17px;background:#fff;width:100%">${L.units.map((x, i) => `<option value="${i + 1}" ${u === i + 1 ? "selected" : ""}>Unit ${i + 1}</option>`).join("")}</select></div><p class="muted small">${u > 1 ? TL(`Unit 1–${u - 1} 단어는 복습으로 조금씩 나와요.`, `Words from Units 1–${u - 1} come back as review.`) : TL("나중에 Me → 내 코스에서 바꿀 수 있어요.", "You can change it later in Me → My course.")}</p>`; })() : ""}`; }
-  if (v === "th") more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${CX.themes.map(p => `<button class="opt ${ST._suLevel === p.id ? "sel" : ""}" data-act="suLevel" data-v="${p.id}" style="min-height:52px;${ST._suLevel === p.id ? `background:${TH_COLOR[p.id]};color:#fff;border-color:${TH_COLOR[p.id]}` : `border-left:8px solid ${TH_COLOR[p.id]}`}">${TL(p.ko, p.name)}</button>`).join("")}</div>`;
+  if (v === "wb") { const b = CX.books[0]; const L = ST._suLevel && b.levels.find(x => x.id === ST._suLevel); const u = ST._suUnit || 1;
+    more = `<div class="bk-row" style="width:100%">${b.levels.map(x => bookTile(x, ST._suLevel === x.id, "suLevel")).join("")}</div>
+      ${L ? `<p class="label" style="margin:4px 0 0;align-self:flex-start">${TL("어느 유닛부터 할까?", "Start from which unit?")}</p>${unitStops({ units: L.units, color: L.color, unitName: i => "Unit " + (i + 1) }, u, 0, "suUnitPick", true)}
+      <p class="muted small" style="margin:0;align-self:flex-start">${u > 1 ? TL(`Unit 1–${u - 1} 단어는 복습으로 조금씩 나와요.`, `Words from Units 1–${u - 1} come back as review.`) : TL("나중에 Me → 내 코스에서 바꿀 수 있어요.", "You can change it later in Me → My course.")}</p>` : ""}`; }
+  if (v === "th") more = `<div class="pk-grid compact" style="width:100%">${CX.themes.map(p => packTile(p, ST._suLevel === p.id, "suLevel")).join("")}</div>`;
   return { mood: "think", q: TL("어떤 단어를<br>배울까?", "What do you want<br>to learn?"), sub: UI() === "en" ? "" : "What do you want to learn?",
-    body: `<div class="goals">${opt("grade", TL("내 수준에 맞게", "Words for my level"), TL("방금 본 레벨 테스트에 맞춰 골라 줘요", "Picked from the level test you just took"))}${wbVisible() ? opt("wb", TL("워크북 코스", "Workbook course"), "Vocabulary Workshop · Red · Purple · Green · Orange") : ""}${opt("th", TL("테마 팩", "Theme packs"), TL("여행 · 비즈니스 · 주방 · 쇼핑 · 건강 · 감정", "Travel · Business · Kitchen · Shopping · Health · Feelings"))}</div>${more}`,
+    body: `<div class="stack" style="gap:10px;width:100%">${v === "wb" || v === "th" ? kindTile(v, true, "suCourse", v === "wb" ? TL("워크북", "Workbook") : TL("테마 팩", "Theme packs"), TL("눌러서 다시 고르기", "Tap to choose again"), KD_IC[v]).replace('data-v="' + v + '"', 'data-v="pick"')
+      : kindTile("grade", v === "grade", "suCourse", TL("내 수준에 맞게", "Words for my level"), TL("방금 본 레벨 테스트로 골라 줘요", "Picked from the test you just took"), KD_IC.grade) + (wbVisible() ? kindTile("wb", false, "suCourse", TL("워크북", "Workbook"), "Vocabulary Workshop", KD_IC.wb) : "") + kindTile("th", false, "suCourse", TL("테마 팩", "Theme packs"), TL("여행 · 비즈니스 · 생활 영어", "Travel · business · everyday"), KD_IC.th)}${more}</div>`,
     ok: () => v === "grade" || ((v === "wb" || v === "th") && !!ST._suLevel && (v === "wb" ? CX.books[0].levels.some(L => L.id === ST._suLevel) : CX.themes.some(p => p.id === ST._suLevel))),
     commit: () => { if (v === "grade") { if (ST.course) setCourse(null); } else { const c = v === "wb" ? { type: "wb", book: "vw", level: ST._suLevel, unit: ST._suUnit || 1 } : { type: "th", pack: ST._suLevel, unit: 1 };
       if (!ST.course || (ST.course.level || ST.course.pack) !== ST._suLevel || (c.unit || 1) !== (ST.course.unit || 1)) setCourse(c); } delete ST._suCourse; delete ST._suLevel; delete ST._suUnit; } };
@@ -3425,7 +3449,7 @@ document.addEventListener("click", async ev => {
   if (a === "coachNext") return coachNext();
   if (a === "celOk") return celOk();
   if (a === "pushOn") return turnOnPush(b);
-  if (a === "story") { if (!IS_OWNER && ST.week && !storyReady()) return; return openStory(); }
+  if (a === "story") { if (ST.week && !storyReady()) { const P = packInfo(); toast(TL(`단어 5개를 배우면 이야기가 열려요 (${P ? P.learned : 0}/5)`, `The story opens after you learn 5 words (${P ? P.learned : 0}/5)`)); return; } return openStory(); }
   if (a === "sword") { const e = BY[b.dataset.id]; speak(e.id, "w"); toast(e.w + ": " + e.def + (KO() && STORY && STORY.step === "after" ? " (" + senseList(e).map(s => s.ko).join(" / ") + ")" : "")); return; }
   if (a === "readPara") return readPara(+b.dataset.i);
   if (a === "toggleKo") { STORY.showKo[b.dataset.i] = !STORY.showKo[b.dataset.i]; return render(); }
