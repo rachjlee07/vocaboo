@@ -14,6 +14,20 @@ def bank():
     i = s.index("[", s.index("window.__BANK__")); arr, _ = json.JSONDecoder().raw_decode(s[i:])
     return arr
 
+def course_entries(b):
+    """course packs (app/courses.js): each unit gets its own pack with the word, its 3 course sentences and the tile sentence"""
+    f = os.path.join(ROOT, "app", "courses.js")
+    if not os.path.exists(f): return []
+    s = open(f, encoding="utf-8").read(); out = []
+    i = s.index("[", s.index("var N=")); N, _ = json.JSONDecoder().raw_decode(s[i:])
+    i = s.index("{", s.index("window.__CX__")); CX, _ = json.JSONDecoder().raw_decode(s[i:])
+    words = {idof(e["w"]): e["w"] for e in b}; words.update({idof(e["w"]): e["w"] for e in N})
+    for key, m in CX["items"].items():
+        for wid, it in m.items():
+            if wid not in words: continue
+            out.append({"w": words[wid], "src": [it["pk"]], "ex": it.get("ex") or [], "tr": (it.get("tr") or {}).get("en"), "_c": 1})
+    return out
+
 def test_ids():
     s = open(os.path.join(ROOT, "app", "words.js"), encoding="utf-8").read()
     if "window.__TEST__" not in s: return []
@@ -28,6 +42,12 @@ def packs():
 
 def tasks(b, P):
     t = []
+    for e in course_entries(b):
+        i = idof(e["w"]); pk = P.get(e["src"][0], {}); ent = pk.get(i) if isinstance(pk.get(i), dict) else {}
+        if not ent.get("w"): t.append((e, i, "w"))
+        for k in range(len(e["ex"][:3])):
+            if not ent.get("e%d" % k): t.append((e, i, "e%d" % k))
+        if e.get("tr") and not ent.get("t"): t.append((e, i, "t"))
     for e in b:
         i = idof(e["w"]); pk = P.get(e["src"][0], {}); ent = pk.get(i) if isinstance(pk.get(i), dict) else {}
         done = set(pk.get("_bella", []))
@@ -44,6 +64,7 @@ def record(e, tag):
         from kokoro_onnx import Kokoro
         K = Kokoro(os.path.join(HERE, "kokoro.onnx"), os.path.join(HERE, "bella.npz"))
     if tag == "w": ps, sp = (OVERRIDE.get(e["w"]) or g2p(e["w"])) + ".", 0.9
+    elif tag == "t": ps, sp = g2p(e["tr"]), 0.92
     else: ps, sp = g2p(e["ex"][int(tag[1])]), 0.92
     a, sr = K.create(ps, voice="af_bella", speed=sp, is_phonemes=True); a = a.astype(np.float32)
     idx = np.where(np.abs(a) > 0.01)[0]
@@ -61,7 +82,7 @@ def part(p, n):
     print("total tasks", len(T), "this part", len(mine), flush=True)
     out = {}
     for k, (e, i, tag) in enumerate(mine):
-        try: out.setdefault(i, {"src": e["src"][0]})[tag] = record(e, tag)
+        try: out.setdefault(e["src"][0] + "|" + i, {"src": e["src"][0], "id": i})[tag] = record(e, tag)
         except Exception as ex: print("skip", e["w"], tag, ex)
         if k % 200 == 0: print(k, e["w"], tag, flush=True)
     json.dump(out, open(os.path.join(ROOT, "out_part_%d.json" % p), "w"), separators=(",", ":"))
@@ -71,10 +92,10 @@ def merge():
     P = packs(); n = 0; b = {idof(e["w"]): e for e in bank()}
     for f in glob.glob(os.path.join(ROOT, "**", "out_part_*.json"), recursive=True):
         for i, d in json.load(open(f)).items():
-            src = d.pop("src"); pk = P.setdefault(src, {}); ent = pk.get(i) if isinstance(pk.get(i), dict) else {}
+            src = d.pop("src"); i = d.pop("id", i.split("|")[-1]); pk = P.setdefault(src, {}); ent = pk.get(i) if isinstance(pk.get(i), dict) else {}
             ent.update(d); pk[i] = ent; n += len(d)
             e = b.get(i)
-            if e and all(("e%d" % k) in ent for k in range(len((e.get("ex") or [])[:2]))):
+            if e and e["src"][0] == src and all(("e%d" % k) in ent for k in range(len((e.get("ex") or [])[:2]))):
                 pk["_bella"] = sorted(set(pk.get("_bella", [])) | {i})
     tp = P.setdefault("TEST", {})  # the level test loads only this pack
     for i in test_ids():
