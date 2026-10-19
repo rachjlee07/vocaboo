@@ -2159,7 +2159,7 @@ function lineChartG(H) {
 /* ---------- menu (always reachable) ---------- */
 function gearHtml() { return `<button id="gearBtn" class="gear" data-act="menu" aria-label="Menu">⋯</button>`; }
 function drawGear() {
-  let g = document.getElementById("gearBtn"); const show = mode === "student" && ["onboard", "pending", "rejected", "levelIntro", "placementIntro", "error", "who"].includes(view.name) && view.name !== "who"; // only on setup screens, so nobody gets stuck
+  let g = document.getElementById("gearBtn"); const show = mode === "student" && ["onboard", "pending", "rejected", "levelIntro", "placementIntro", "error", "who"].includes(view.name) && view.name !== "who" || (IS_OWNER && mode === "student" && ["setup", "levelResult", "hello"].includes(view.name)); // only on setup screens, so nobody gets stuck
   if (!show) { if (g) g.remove(); return; }
   if (!g) { const w = document.createElement("div"); w.innerHTML = gearHtml(); document.body.appendChild(w.firstChild); }
 }
@@ -2440,7 +2440,7 @@ function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInte
   return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
 
 /* ---------- "new version" popup ---------- */
-const APP_VER = "ca6140ba2f"; let VER_SNOOZE = 0;
+const APP_VER = "501bf4150a"; let VER_SNOOZE = 0;
 async function checkVersion() {
   if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
   try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
@@ -3097,7 +3097,7 @@ function tBar(o) { // clean top bar: back, title, small icon buttons
   return `<header class="tbar"><div class="tbar-l">${o.back ? `<button class="icon-btn" data-act="tBackList" aria-label="All students">${I.back}</button>` : ""}${o.avatar ? `<span class="avatar">${esc(o.avatar)}</span>` : ""}
     <div class="stack" style="gap:0;min-width:0"><span class="tbar-sub ellipsis">${o.sub}</span><h1 class="tbar-title ellipsis">${esc(o.title)}</h1></div></div>
     <div class="tbar-r"><button class="icon-btn" data-act="refresh" aria-label="Refresh" title="Refresh">${I.reload}</button>${o.home ? `<button class="icon-btn" data-act="tFeedback" aria-label="Feedback" title="Feedback">💬</button><button class="icon-btn" data-act="tGlobal" aria-label="Settings" title="Settings for everyone">⚙️</button>` : ""}
-      <div class="more"><button class="icon-btn" data-act="tMore" aria-label="More">⋯</button><div class="more-menu" id="tMoreMenu" hidden>${o.home ? `<button data-act="preview">🧪 Try as student</button>` : ""}<button data-act="signout">↩️ Sign out</button></div></div></div></header>`; }
+      <div class="more"><button class="icon-btn" data-act="tMore" aria-label="More">⋯</button><div class="more-menu" id="tMoreMenu" hidden>${o.home ? `<button data-act="preview">🧪 Try as student</button><button data-act="previewRestartAsk">↺ Start over as new</button>` : ""}<button data-act="signout">↩️ Sign out</button></div></div></div></header>`; }
 function emptyAccounts() { return T.students.filter(s => !s.test && s.approved !== false && !s.rejected && !s.profile && s.created && Date.now() - s.created > 7 * 864e5); }
 function renderTeacherList() {
   const empty = new Set(emptyAccounts().map(s => s._id));
