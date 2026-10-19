@@ -194,7 +194,23 @@ function buildPlacement() {
   const C = BANK.filter(e => e.book === "C" && e.cu < CFG.startUnit);
   const ids = pick(A, 10).concat(pick(B, 15)).concat(pick(C, 35)).map(e => e.id);
   return shuffle(ids).map((id, i) => makeQ(id, i % 2 ? "mc_ko" : "ko_en", ids));
-}const AUDIO_BASE = window.__audioBase || "audio/"; // beta copies point at the main app's audio folder
+}
+/* ---------- app language: 한국어 or English for the interface (separate from word meanings, which is KO()) ---------- */
+const UI = () => (ST && ST.settings && ST.settings.ui) || (ST && ST.profile ? "" : (function () { try { return localStorage.getItem("vb_ui"); } catch (e) { return ""; } })()) || "ko"; // a saved profile without a choice stays Korean
+const TL = (ko, en) => UI() === "en" ? en : ko;      // inline pairs
+const TT = { // reused strings
+  next: ["계속 →", "Continue →"],
+  listen: ["듣기", "Listen"],
+  doneToday: ["오늘 완료 ✓", "Done today ✓"],
+  opensAfter: ["단어 배우면 열려요", "Opens after today's words"],
+  newSentence: ["새 문장", "New sentence"],
+  listening: ["듣고 있어요…", "Listening…"],
+  parents: ["부모님", "Parents"],
+  myVoice: ["내 목소리", "My voice"]
+};
+const TLK = k => (TT[k] || [k, k])[UI() === "en" ? 1 : 0];
+function setUi(v) { v = v === "en" ? "en" : "ko"; if (ST) { ST.settings = Object.assign({}, ST.settings || {}, { ui: v }); if (ST.profile) saveST(); } try { localStorage.setItem("vb_ui", v); } catch (e) {} }
+const AUDIO_BASE = window.__audioBase || "audio/"; // beta copies point at the main app's audio folder
 
 /* ---------- recorded audio ---------- */
 const PACKS = {}, PACK_LOADING = {};
@@ -451,13 +467,13 @@ function greeting() { const h = new Date().getHours(); return h < 12 ? "Good mor
 /* ---------- Today ---------- */
 function bubboSays() { // one line from Bubbo for the Today screen, different each day
   const P = packInfo(); const nm = firstName(); const qd = quizDoneToday(); const locked = ST.lock && ST.lock.on; const h = new Date().getHours(); const day = +today().slice(-2);
-  const pick = a => a[day % a.length]; const n = nm || "친구";
-  const hi = pick(h < 12 ? [`좋은 아침, ${n}!`, `${n}, 아침부터 멋져.`, `일어났구나, ${n} ☀️`] : h < 18 ? [`안녕, ${n}!`, `${n} 왔다!`, `오늘도 반가워, ${n}.`] : [`저녁이네, ${n}.`, `${n}, 하루 수고했어.`, `자기 전 단어 타임 🌙`]);
-  if (locked) return { mood: "think", t: `${hi} 어제 틀린 단어 <b>${ST.lock.ids.length}개</b>만 다시 보면 퀴즈가 열려.` };
-  if (P && P.due > 0) return { mood: "happy", t: `${hi} ${pick([`오늘은 <b>단어 ${P.due}개</b>만. 다 하면 나랑 문장 만들기 하자.`, `<b>단어 ${P.due}개</b>면 오늘 끝! 시작해 볼까?`, `딱 <b>${P.due}개</b>야. 10분 안에 끝내 보자.`, `오늘 단어 <b>${P.due}개</b> 준비해 놨어. 공책도 꺼냈고!`])}` };
-  if (!qd) return { mood: "wow", t: `${hi} ${pick(["오늘 단어는 끝! 이제 <b>퀴즈</b>로 확인해 볼까?", "단어 다 외웠지? <b>퀴즈</b>에서 증명해 봐!", "이제 <b>퀴즈</b> 차례. 스트릭 🔥 지키자."])}` };
-  if (ST.coachDay !== today()) return { mood: "cheer", t: pick(["퀴즈까지 끝! 이제 배운 단어로 <b>네 문장</b>을 말해 줘.", "퀴즈 통과 🎉 이제 나랑 <b>문장 만들기</b> 할 시간!", "잘했어! 마지막으로 <b>네 문장</b> 하나만 들려줘."]) };
-  return { mood: "cheer", t: pick(["오늘 할 일 다 했어! 내일 또 보자 🙌", "완벽한 하루야. 내일도 이 자리에서!", "오늘 몫 끝! 플래시카드로 더 놀아도 돼 😎"]) };
+  const pick = a => a[day % a.length]; const n = nm || TL("친구", "friend");
+  const hi = pick(TL(h < 12 ? [`좋은 아침, ${n}!`, `${n}, 아침부터 멋져.`, `일어났구나, ${n} ☀️`] : h < 18 ? [`안녕, ${n}!`, `${n} 왔다!`, `오늘도 반가워, ${n}.`] : [`저녁이네, ${n}.`, `${n}, 하루 수고했어.`, `자기 전 단어 타임 🌙`], h < 12 ? [`Good morning, ${n}!`, `${n}, looking sharp this morning.`, `You're up, ${n} ☀️`] : h < 18 ? [`Hi, ${n}!`, `${n} is here!`, `Good to see you again, ${n}.`] : [`Evening already, ${n}.`, `${n}, you worked hard today.`, `Word time before bed 🌙`]));
+  if (locked) return { mood: "think", t: TL(`${hi} 어제 틀린 단어 <b>${ST.lock.ids.length}개</b>만 다시 보면 퀴즈가 열려.`, `${hi} Review the <b>${ST.lock.ids.length} missed word${ST.lock.ids.length === 1 ? "" : "s"}</b> from yesterday and the quiz opens.`) };
+  if (P && P.due > 0) return { mood: "happy", t: `${hi} ${pick(TL([`오늘은 <b>단어 ${P.due}개</b>만. 다 하면 나랑 문장 만들기 하자.`, `<b>단어 ${P.due}개</b>면 오늘 끝! 시작해 볼까?`, `딱 <b>${P.due}개</b>야. 10분 안에 끝내 보자.`, `오늘 단어 <b>${P.due}개</b> 준비해 놨어. 공책도 꺼냈고!`], [`Just <b>${P.due} word${P.due === 1 ? "" : "s"}</b> today. Then let's make sentences together.`, `<b>${P.due} word${P.due === 1 ? "" : "s"}</b> and you're done for today. Shall we start?`, `Only <b>${P.due}</b>. Let's finish in 10 minutes.`, `I've got today's <b>${P.due} word${P.due === 1 ? "" : "s"}</b> ready. Notebook's out too!`]))}` };
+  if (!qd) return { mood: "wow", t: `${hi} ${pick(TL(["오늘 단어는 끝! 이제 <b>퀴즈</b>로 확인해 볼까?", "단어 다 외웠지? <b>퀴즈</b>에서 증명해 봐!", "이제 <b>퀴즈</b> 차례. 스트릭 🔥 지키자."], ["Today's words are done. Shall we check them with the <b>quiz</b>?", "Learned them all? Show it in the <b>quiz</b>!", "Now it's <b>quiz</b> time. Let's keep the streak 🔥."]))}` };
+  if (ST.coachDay !== today()) return { mood: "cheer", t: pick(TL(["퀴즈까지 끝! 이제 배운 단어로 <b>네 문장</b>을 말해 줘.", "퀴즈 통과 🎉 이제 나랑 <b>문장 만들기</b> 할 시간!", "잘했어! 마지막으로 <b>네 문장</b> 하나만 들려줘."], ["Quiz done! Now say <b>your own sentences</b> with your words.", "Quiz passed 🎉 Time to <b>make sentences</b> with me!", "Nice work! Last thing: tell me <b>one sentence of your own</b>."])) };
+  return { mood: "cheer", t: pick(TL(["오늘 할 일 다 했어! 내일 또 보자 🙌", "완벽한 하루야. 내일도 이 자리에서!", "오늘 몫 끝! 플래시카드로 더 놀아도 돼 😎"], ["All done for today! See you tomorrow 🙌", "A perfect day. Same place tomorrow!", "Today's done. Play with flashcards if you like 😎"])) };
 }
 function renderToday() {
   saveStars(); const s = streakNow(); const wk = ST.week; const ids = weekIds();
@@ -469,20 +485,20 @@ function renderToday() {
   const todayIds = P ? (dueN ? nextPackIds(dueN) : []) : [];
   const dayLabel = P ? (weekend ? "CATCH-UP DAY" : "DAY " + Math.min(5, Math.max(1, weekStage())) + " OF 5") : "";
   const wordTile = (id, k) => { const e = BY[id]; const on = k === 0; return `<div style="border-radius:14px;background:${on ? "var(--accent)" : "var(--soft)"};color:${on ? "var(--accent-ink)" : "var(--muted)"};padding:10px 10px 8px;min-width:0"><div style="font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:-.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.w)}</div><div class="small" style="opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(gloss(e))}</div></div>`; };
-  const learnCard = locked ? `<div class="card ink"><div class="row between"><h2>어제 틀린 단어</h2><span class="pill bad">${ST.lock.ids.length}</span></div><div class="chips">${ST.lock.ids.slice(0, 6).map(id => `<span class="chip">${esc(BY[id].w)}</span>`).join("")}</div><button class="big primary" data-act="train">⚡ 빠르게 다시 보기</button></div>`
+  const learnCard = locked ? `<div class="card ink"><div class="row between"><h2>${TL("어제 틀린 단어", "Missed yesterday")}</h2><span class="pill bad">${ST.lock.ids.length}</span></div><div class="chips">${ST.lock.ids.slice(0, 6).map(id => `<span class="chip">${esc(BY[id].w)}</span>`).join("")}</div><button class="big primary" data-act="train">${TL("⚡ 빠르게 다시 보기", "⚡ Quick review")}</button></div>`
     : dueN > 0 ? `<div class="card ink"><div class="row between"><h2>Today's words</h2><span class="muted" style="font-family:var(--f-mono);font-size:13px">${P.todayDone > 0 ? P.todayDone : 0} / ${P.todayTarget}</span></div>
         <div style="display:grid;grid-template-columns:repeat(${Math.min(3, todayIds.length)},minmax(0,1fr));gap:8px">${todayIds.slice(0, 3).map(wordTile).join("")}</div>${todayIds.length > 3 ? `<p class="muted small">+ ${todayIds.length - 3} more</p>` : ""}
-        <button class="big primary" data-act="train">시작하기 · 약 ${Math.max(3, dueN * 2)}분 →</button></div>`
-    : `<div class="card" style="background:var(--accent-soft);border-color:transparent"><div class="row between"><h2>오늘 단어 끝 ✓</h2><span class="muted" style="font-family:var(--f-mono);font-size:13px">${P ? P.learned + " / " + P.total : ""} this week</span></div>
-        ${P && P.remaining ? `<button class="big" data-act="learnMore" style="background:var(--card);border:1.5px solid var(--ink)">+ ${Math.min(2, P.remaining)}개 더 배우기 (선택)</button>` : `<p class="muted small">이번 주 단어를 다 배웠어요 🏆</p>`}</div>`;
+        <button class="big primary" data-act="train">${TL(`시작하기 · 약 ${Math.max(3, dueN * 2)}분 →`, `Start · about ${Math.max(3, dueN * 2)} min →`)}</button></div>`
+    : `<div class="card" style="background:var(--accent-soft);border-color:transparent"><div class="row between"><h2>${TL("오늘 단어 끝 ✓", "Today's words done ✓")}</h2><span class="muted" style="font-family:var(--f-mono);font-size:13px">${P ? P.learned + " / " + P.total : ""} this week</span></div>
+        ${P && P.remaining ? `<button class="big" data-act="learnMore" style="background:var(--card);border:1.5px solid var(--ink)">${TL(`+ ${Math.min(2, P.remaining)}개 더 배우기 (선택)`, `+ Learn ${Math.min(2, P.remaining)} more (optional)`)}</button>` : `<p class="muted small">${TL("이번 주 단어를 다 배웠어요 🏆", "You learned all of this week's words 🏆")}</p>`}</div>`;
   const tile = (o) => `<button class="step-card ${o.done ? "complete" : ""}" data-act="${o.act}" ${o.disabled ? "disabled" : ""} style="flex-direction:column;align-items:flex-start;padding:14px;gap:8px;min-height:120px">
       <span style="width:36px;height:36px;border-radius:11px;background:${o.done ? "var(--accent)" : "var(--soft)"};display:grid;place-items:center">${o.icon}</span>
       <span style="font-weight:700;font-size:15px;line-height:1.25">${o.title}</span><span class="muted small">${o.sub}</span></button>`;
   const ic = n => (I[n] || "").replace("<svg", '<svg width="18" height="18"');
-  const coachTile = tile({ act: "coach", done: cd, disabled: needIntro, icon: ic("coachI"), title: "Bubbo랑 문장 만들기", sub: cd ? "오늘 완료 ✓" : needIntro ? "단어 배우면 열려요" : `${coachN}/${cT} 문장` });
-  const quizTile = tile({ act: "quiz", done: qd && !locked, disabled: needIntro || locked, icon: ic("pencil"), title: "데일리 퀴즈", sub: qd ? "오늘 완료 ✓" : needIntro ? "단어 배우면 열려요" : locked ? "틀린 단어 먼저" : `${quizLen()}문제 · 스트릭 지키기` });
-  const storyTile = tile({ act: "story", done: sd, disabled: storyLock, icon: ic("book"), title: "이번 주 이야기", sub: sd ? "다시 읽기" : storyLock ? `단어 5개 배우면 열려요 (${P ? P.learned : 0}/5)` : sp ? `Part ${sp.n}/${sp.of}` : "내 단어로 만든 이야기" });
-  const bonusTile = tile({ act: "trainWeak", done: false, icon: ic("star"), title: "헷갈리는 단어", sub: starIds().length ? `⭐ ${starIds().length}개 연습` : "☆을 눌러 담아 봐" });
+  const coachTile = tile({ act: "coach", done: cd, disabled: needIntro, icon: ic("coachI"), title: TL("Bubbo랑 문장 만들기", "Sentences with Bubbo"), sub: cd ? TLK("doneToday") : needIntro ? TLK("opensAfter") : TL(`${coachN}/${cT} 문장`, `${coachN}/${cT} sentences`) });
+  const quizTile = tile({ act: "quiz", done: qd && !locked, disabled: needIntro || locked, icon: ic("pencil"), title: TL("데일리 퀴즈", "Daily quiz"), sub: qd ? TLK("doneToday") : needIntro ? TLK("opensAfter") : locked ? TL("틀린 단어 먼저", "Missed words first") : TL(`${quizLen()}문제 · 스트릭 지키기`, `${quizLen()} questions · keep your streak`) });
+  const storyTile = tile({ act: "story", done: sd, disabled: storyLock, icon: ic("book"), title: TL("이번 주 이야기", "This week's story"), sub: sd ? TL("다시 읽기", "Read again") : storyLock ? TL(`단어 5개 배우면 열려요 (${P ? P.learned : 0}/5)`, `Opens after 5 words (${P ? P.learned : 0}/5)`) : sp ? `Part ${sp.n}/${sp.of}` : TL("내 단어로 만든 이야기", "A story made from your words") });
+  const bonusTile = tile({ act: "trainWeak", done: false, icon: ic("star"), title: TL("헷갈리는 단어", "Tricky words"), sub: starIds().length ? TL(`⭐ ${starIds().length}개 연습`, `⭐ Practice ${starIds().length}`) : TL("☆을 눌러 담아 봐", "Tap ☆ to add words") });
   $app.innerHTML = `${previewBar()}<div class="row between" style="padding-top:14px"><span class="eyebrow">${dayLabel}${wk ? " · " + wk.newIds.length + " WORDS THIS WEEK" : ""}</span><span class="pill" style="font-family:var(--f-mono)">${I.flame.replace("<svg", '<svg width="14" height="14" style="color:#FF7A45"')} ${s}</span></div>
     <div class="ob-ask" style="align-items:flex-end">${bubbo(say.mood, 64)}<div class="bub" style="flex:1"><div class="eyebrow" style="font-size:11px;margin-bottom:2px">BUBBO</div>${say.t}</div></div>
     ${inappBanner()}${installBanner()}
@@ -490,7 +506,7 @@ function renderToday() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${coachTile}${quizTile}${storyTile}${bonusTile}</div>
     ${lastVoiceCard()}
     ${spacedCard()}
-    ${!IS_OWNER && !pushOn() && WW.pushPermission() !== "denied" && WW.pushPermission() !== "unsupported" ? `<div class="notice info row between"><span>🔔 알림 받기</span><button class="primary" data-act="pushOn">켜기</button></div>` : ""}
+    ${!IS_OWNER && !pushOn() && WW.pushPermission() !== "denied" && WW.pushPermission() !== "unsupported" ? `<div class="notice info row between"><span>${TL("🔔 알림 받기", "🔔 Get reminders")}</span><button class="primary" data-act="pushOn">${TL("켜기", "Turn on")}</button></div>` : ""}
     <div class="row between muted small" style="padding:0 4px"><span>${ST.level ? `<button class="ghost grade-tap" data-act="showGrade" style="min-height:32px;padding:0">📈 ${esc(gradeWord(ST.level.g))} ›</button>` : ""}</span><span>${mastered}/${ids.length} mastered</span></div>`;
   if (!tourAsked && !IS_OWNER && maybeAskPush()) { tourAsked = true; return; }
   if (ST.tourDone && !IS_OWNER && maybeWeekCard()) return;
@@ -575,14 +591,16 @@ function renderProgress() {
 function renderMe() {
   const email = (WW.user() && WW.user().email) || "";
   $app.innerHTML = `${previewBar()}<div class="stack" style="padding-top:18px;align-items:center;text-align:center">${bubbo("happy", 96)}<h1>${esc(firstName() || email.split("@")[0] || "Me")}</h1><p class="muted">${esc(email)}</p>${ST.level ? `<button class="pill grade-tap" data-act="showGrade" style="font-size:15px;padding:6px 14px">📈 ${esc(gradeWord(ST.level.g))} · see details ›</button>` : ""}</div>
+   <div class="card" style="gap:8px"><div class="row between"><h3>${TL("언어 · Language", "Language")}</h3></div><div class="seg" style="width:100%"><button data-act="setUi" data-v="ko" aria-pressed="${UI() !== "en"}" style="flex:1">한국어</button><button data-act="setUi" data-v="en" aria-pressed="${UI() === "en"}" style="flex:1">English</button></div></div>
+   <div class="card" style="gap:8px"><div class="row between"><h3>${TL("단어 뜻 · Meanings", "Meanings")}</h3></div><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">${TL("영어 + 한국어", "English + Korean")}</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
    <div class="card"><h3>This week's goal</h3>${goalHtml()}</div>
-   ${IS_OWNER ? `<button class="big primary icon-l" data-act="openParent">👨‍👩‍👧 For parents · 부모님 ${FAMPIN ? "🔒" : ""}</button>` : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="big primary" data-act="openParent" style="padding:10px 8px">👨‍👩‍👧 For parents${FAMPIN ? " 🔒" : ""}<br><span class="small" style="font-weight:600;opacity:.85">부모님</span></button>
-     <button class="big" data-act="menuSwitch" style="padding:10px 8px">${(FAM || []).length > 1 ? "👥 Switch or add child" : "➕ Add a child"}<br><span class="small" style="font-weight:600;opacity:.8">${(FAM || []).length > 1 ? "자녀 바꾸기 · 추가" : "자녀 추가"}</span></button></div>`}
+   ${IS_OWNER ? `<button class="big primary icon-l" data-act="openParent">👨‍👩‍👧 ${TL("For parents · 부모님", "For parents")} ${FAMPIN ? "🔒" : ""}</button>` : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><button class="big primary" data-act="openParent" style="padding:10px 8px">${TL("부모님 설정 · For parents", "For parents")}${FAMPIN ? " 🔒" : ""}<br><span class="small" style="font-weight:600;opacity:.85">${TL("부모님", "Report & settings")}</span></button>
+     <button class="big" data-act="menuSwitch" style="padding:10px 8px">${(FAM || []).length > 1 ? "👥 Switch or add child" : "➕ Add a child"}<br><span class="small" style="font-weight:600;opacity:.8">${(FAM || []).length > 1 ? TL("자녀 바꾸기 · 추가", "Profiles") : TL("자녀 추가", "Profiles")}</span></button></div>`}
    <button class="big icon-l" data-act="weekCard">📸 My weekly card</button>
-   <div class="card"><h3>My colors · 내 색</h3>${themePicker()}</div>
+   <div class="card"><h3>${TL("My colors · 내 색", "My colors")}</h3>${themePicker()}</div>
    ${textCard()}
-   <div class="card"><div class="row between"><h3>Record my voice</h3><button class="pill ${ST.settings && ST.settings.record === false ? "" : "sun"}" data-act="toggleRec" style="min-height:36px">${ST.settings && ST.settings.record === false ? "Off" : "On"}</button></div><p class="muted small">When on, you can replay your own voice next to Bella's. Recordings stay on this phone only and are never uploaded. 녹음은 이 휴대폰에만 저장돼요.</p></div>
-   <div class="card"><div class="row between"><h3>효과음 · 진동</h3><button class="pill ${fxOn() ? "sun" : ""}" data-act="toggleFx" style="min-height:36px">${fxOn() ? "On" : "Off"}</button></div><p class="muted small">정답, 목표 달성, 별표에 짧은 소리와 진동이 울려요. Sounds and a little buzz when you get things right.</p></div>
+   <div class="card"><div class="row between"><h3>Record my voice</h3><button class="pill ${ST.settings && ST.settings.record === false ? "" : "sun"}" data-act="toggleRec" style="min-height:36px">${ST.settings && ST.settings.record === false ? "Off" : "On"}</button></div><p class="muted small">When on, you can replay your own voice next to Bella's. Recordings stay on this phone only and are never uploaded.${TL(" 녹음은 이 휴대폰에만 저장돼요.", "")}</p></div>
+   <div class="card"><div class="row between"><h3>${TL("효과음 · 진동", "Sounds & vibration")}</h3><button class="pill ${fxOn() ? "sun" : ""}" data-act="toggleFx" style="min-height:36px">${fxOn() ? "On" : "Off"}</button></div><p class="muted small">${TL("정답, 목표 달성, 별표에 짧은 소리와 진동이 울려요. Sounds and a little buzz when you get things right.", "Sounds and a little buzz when you get things right.")}</p></div>
    <div class="card"><h3>Streak freezes ❄️</h3><p class="muted small">You have <b>${ST.freezes || 0}</b> of 2. A freeze saves your streak if you miss one day. Earn one for every 5 daily quizzes.</p></div>
    <div class="card"><div class="row between"><h3>Level ${levelInfo().n}</h3><span class="pill sun">${ST.xp || 0} XP</span></div>${levelBar()}<p class="muted small">Earn XP for every right answer, word you learn, sentence and story.</p></div>
    <div class="card"><div class="row between"><h3>Badges</h3><span class="pill">${Object.keys(ST.badges || {}).length}/${BADGES.length}</span></div>${badgeGrid()}</div>
@@ -632,7 +650,7 @@ function renderRun() {
   let body = "";
   if (q.t === "match") body = "";
   else if (q.t === "say_en") body = runSayHtml(q, e);
-  else if (typed) body = `<form class="stack" data-form="answer"><input class="answer" id="ans" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" ${RUN.answered ? "disabled" : ""} value="${esc(RUN.lastAns || "")}" aria-label="Your answer" placeholder="${q.t === "en_ko" ? "한국어로 쓰세요" : "Type here"}" ${q.t === "en_ko" ? 'lang="ko"' : ""}>
+  else if (typed) body = `<form class="stack" data-form="answer"><input class="answer" id="ans" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" ${RUN.answered ? "disabled" : ""} value="${esc(RUN.lastAns || "")}" aria-label="Your answer" placeholder="${q.t === "en_ko" ? TL("한국어로 쓰세요", "Type it in Korean") : "Type here"}" ${q.t === "en_ko" ? 'lang="ko"' : ""}>
      ${RUN.answered ? "" : `<button class="big primary" type="submit">Check</button><button type="button" class="ghost" data-act="idk" style="align-self:center">I don't know</button>`}</form>`;
   else body = `<div class="opts">${q.opts.map(o => { let c = ""; const bw = q.t === "blank_mc" && (RUN.bWrong || []).includes(o.id); if (RUN.answered) { if (o.id === q.id) c = "right"; else if (o.id === RUN.picked) c = "wrong"; } else if (bw) c = "wrong";
      return `<button class="opt ${c}" data-act="pick" data-id="${o.id}" ${RUN.answered || bw ? "disabled" : ""}>${esc(o.label)}</button>`; }).join("")}</div>${RUN.kind === "skipcheck" && !RUN.answered ? `<button type="button" class="ghost" data-act="idk" style="align-self:center">I don't know</button>` : ""}`;
@@ -857,33 +875,33 @@ function startSpeak() { const e = BY[TR.queue[0]];
   TR.step = "speak"; render(); speak(e.id, "w"); }
 function speakHtml(e) {
   const sp = TR.sp; const done = sp.idx >= sp.targets.length; const tg = sp.targets[sp.idx];
-  const list = sp.targets.map((t, k) => `<span class="pill ${k < sp.idx ? "sun" : k === sp.idx ? "" : ""}" style="${k > sp.idx ? "opacity:.45" : ""}${k === sp.idx ? "background:var(--ink);color:#fff" : ""}">${k < sp.idx ? "✓ " : ""}${t.kind === "w" ? "단어" : "예문 " + k}</span>`).join("");
-  if (done) return `<div class="card" style="align-items:center;text-align:center">${bubbo("cheer", 96)}<h2>말하기 완료!</h2><p class="muted">이제 가리고 써 볼 차례.</p><button class="big primary" data-act="cover" id="nextBtn">가리고 쓰기 ✍️</button></div>`;
+  const list = sp.targets.map((t, k) => `<span class="pill ${k < sp.idx ? "sun" : k === sp.idx ? "" : ""}" style="${k > sp.idx ? "opacity:.45" : ""}${k === sp.idx ? "background:var(--ink);color:#fff" : ""}">${k < sp.idx ? "✓ " : ""}${t.kind === "w" ? TL("단어", "Word") : TL("예문 ", "Example ") + k}</span>`).join("");
+  if (done) return `<div class="card" style="align-items:center;text-align:center">${bubbo("cheer", 96)}<h2>${TL("말하기 완료!", "Speaking done!")}</h2><p class="muted">${TL("이제 가리고 써 볼 차례.", "Now cover it and write it.")}</p><button class="big primary" data-act="cover" id="nextBtn">${TL("가리고 쓰기 ✍️", "Cover & write ✍️")}</button></div>`;
   const vkey = e.id + ":" + tg.tag; const mine = voiceHas(vkey);
   const card = tg.kind === "w"
     ? `<div class="card ink"><div class="row between"><span class="eyebrow">${esc(e.pos)} · ${esc(gradeLabel(e.g) === "–" ? "" : "Grade " + gradeLabel(e.g))}</span><span class="ipa">${esc(e.ipa)}</span></div>
         <div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div><div class="row" style="flex-wrap:nowrap;gap:6px">${starBtn(e.id)}${spk(e.id, "w")}</div></div>
-        <div class="ko hl">${esc(gloss(e))}</div><div class="row">${spk(e.id, "s", "천천히", "icon-l")}</div></div>`
-    : `<div class="card ink"><span class="eyebrow">예문 ${sp.idx} · 듣고 따라 읽기</span><div class="ex">${spk(e.id, tg.tag)}<p style="font-size:21px;font-weight:700">${exHtml(tg.text, e.w)}</p></div></div>`;
-  let mood = "happy", line = tg.kind === "w" ? `마이크를 한 번만 누르고 <b>${esc(e.w)}</b>를 ${tg.need === 1 ? "한 번" : "연달아 " + tg.need + "번"} 말해 줘.` : "문장 전체를 소리 내어 읽어 봐.";
-  if (sp.listening) { mood = "wow"; line = "듣고 있어… 말해 봐!"; }
-  else if (sp.wait && sp.partial) { mood = "happy"; line = `<b>${esc(e.w)}</b> ${tg.got}번 들렸어! 들어 보고, 한 번 더 말하거나 다음으로 가자.`; }
-  else if (sp.wait) { mood = "cheer"; line = tg.kind === "w" ? `와, ${tg.need === 1 ? "성공" : tg.need + "번 성공"}! <b>${esc(e.w)}</b> 정말 잘 들렸어.` : "잘 읽었어! 다음으로 가자."; }
-  else if (sp.heard && sp.ok) { mood = "cheer"; line = `잘 들었어! <b>${esc(e.w)}</b> ${tg.got}번 성공. ${tg.need - tg.got}번만 더!`; }
+        <div class="ko hl">${esc(gloss(e))}</div><div class="row">${spk(e.id, "s", TL("천천히", "Slow"), "icon-l")}</div></div>`
+    : `<div class="card ink"><span class="eyebrow">${TL(`예문 ${sp.idx} · 듣고 따라 읽기`, `Example ${sp.idx} · listen and read along`)}</span><div class="ex">${spk(e.id, tg.tag)}<p style="font-size:21px;font-weight:700">${exHtml(tg.text, e.w)}</p></div></div>`;
+  let mood = "happy", line = tg.kind === "w" ? TL(`마이크를 한 번만 누르고 <b>${esc(e.w)}</b>를 ${tg.need === 1 ? "한 번" : "연달아 " + tg.need + "번"} 말해 줘.`, `Tap the mic once and say <b>${esc(e.w)}</b> ${tg.need === 1 ? "once" : tg.need + " times in a row"}.`) : TL("문장 전체를 소리 내어 읽어 봐.", "Read the whole sentence out loud.");
+  if (sp.listening) { mood = "wow"; line = TL("듣고 있어… 말해 봐!", "Listening… go ahead!"); }
+  else if (sp.wait && sp.partial) { mood = "happy"; line = TL(`<b>${esc(e.w)}</b> ${tg.got}번 들렸어! 들어 보고, 한 번 더 말하거나 다음으로 가자.`, `I heard <b>${esc(e.w)}</b> ${tg.got} time${tg.got === 1 ? "" : "s"}! Listen, then say it once more or move on.`); }
+  else if (sp.wait) { mood = "cheer"; line = tg.kind === "w" ? TL(`와, ${tg.need === 1 ? "성공" : tg.need + "번 성공"}! <b>${esc(e.w)}</b> 정말 잘 들렸어.`, `Wow, ${tg.need === 1 ? "you did it" : tg.need + " for " + tg.need}! <b>${esc(e.w)}</b> came through clearly.`) : TL("잘 읽었어! 다음으로 가자.", "Nicely read! Let's move on."); }
+  else if (sp.heard && sp.ok) { mood = "cheer"; line = TL(`잘 들었어! <b>${esc(e.w)}</b> ${tg.got}번 성공. ${tg.need - tg.got}번만 더!`, `Got it! <b>${esc(e.w)}</b> ${tg.got} done, ${tg.need - tg.got} more to go!`); }
   else if (sp.heard) { mood = "think"; line = esc(sp.heard); }
   const talk = `<div class="ob-ask" style="align-items:flex-start">${bubbo(mood, 52)}<div class="bub" style="flex:1">${line}</div></div>`;
   const dots = tg.kind === "w" ? `<div class="dots" style="justify-content:center">${Array.from({ length: tg.need }, (_, k) => `<i class="${k < tg.got ? "on" : ""}">${k < tg.got ? "" : k + 1}</i>`).join("")}</div>` : "";
-  const cmp = `<div class="card" style="background:var(--soft);border-color:transparent;padding:12px;gap:8px"><span class="eyebrow" style="font-size:11px">COMPARE · 들어 보고 비교하기</span><div class="cmp">
-      <button type="button" data-act="speak" data-id="${e.id}" data-tag="${tg.tag}"><span class="pb">${I.play}</span>원어민</button>
-      <button type="button" class="mine" data-act="playMine" data-key="${esc(vkey)}" ${mine ? "" : "disabled"}><span class="pb">${I.play}</span>${mine ? "내 목소리" : "내 목소리 (아직 없음)"}</button></div></div>`;
+  const cmp = `<div class="card" style="background:var(--soft);border-color:transparent;padding:12px;gap:8px"><span class="eyebrow" style="font-size:11px">${TL("COMPARE · 들어 보고 비교하기", "COMPARE")}</span><div class="cmp">
+      <button type="button" data-act="speak" data-id="${e.id}" data-tag="${tg.tag}"><span class="pb">${I.play}</span>${TL("원어민", "Native speaker")}</button>
+      <button type="button" class="mine" data-act="playMine" data-key="${esc(vkey)}" ${mine ? "" : "disabled"}><span class="pb">${I.play}</span>${mine ? TLK("myVoice") : TL("내 목소리 (아직 없음)", "My voice (not yet)")}</button></div></div>`;
   if (sp.wait) { const last = sp.idx + 1 >= sp.targets.length;
     return `<div class="stack"><div class="row between"><span class="label">Say it out loud</span><div class="chips">${list}</div></div>${card}${talk}${dots}${cmp}
-      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">${sp.partial ? `<button class="big" data-act="mic">🎤 한 번 더</button>` : `<button class="big" data-act="spRedo">🔁 다시</button>`}<button class="big primary" data-act="spNext" id="nextBtn">${last ? "다음: 쓰기 ✍️" : "다음 →"}</button></div></div>`; }
-  const err = sp.err === "blocked" ? micBlockedHtml() : sp.err === "unsupported" ? `<div class="notice">이 브라우저는 듣기를 지원하지 않아요. Safari나 Chrome에서 열어 주세요.</div><button class="big" data-act="cover">쓰기로 넘어가기</button>` : "";
+      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">${sp.partial ? `<button class="big" data-act="mic">${TL("🎤 한 번 더", "🎤 One more")}</button>` : `<button class="big" data-act="spRedo">${TL("🔁 다시", "🔁 Again")}</button>`}<button class="big primary" data-act="spNext" id="nextBtn">${last ? TL("다음: 쓰기 ✍️", "Next: write ✍️") : TL("다음 →", "Next →")}</button></div></div>`; }
+  const err = sp.err === "blocked" ? micBlockedHtml() : sp.err === "unsupported" ? `<div class="notice">${TL("이 브라우저는 듣기를 지원하지 않아요. Safari나 Chrome에서 열어 주세요.", "This browser can't listen. Open Vocaboo in Safari or Chrome.")}</div><button class="big" data-act="cover">${TL("쓰기로 넘어가기", "Go to writing")}</button>` : "";
   return `<div class="stack"><div class="row between"><span class="label">Say it out loud</span><div class="chips">${list}</div></div>${card}${talk}${dots}${mine ? cmp : ""}
     <button class="mic ${sp.listening ? "on" : ""}" id="micBtn" data-act="mic" ${sp.listening ? "disabled" : ""} aria-label="Tap, then speak">${ICON_MIC}</button>
-    <p class="muted small" style="text-align:center">${sp.listening ? "듣고 있어요… 말해 보세요" : "눌러서 말하기"}</p>${err}
-    ${sp.tries >= 3 ? `<button class="big" data-act="spSkip">잘 안 들려요 · 건너뛰기</button>` : ""}</div>`;
+    <p class="muted small" style="text-align:center">${sp.listening ? TL("듣고 있어요… 말해 보세요", "Listening… speak now") : TL("눌러서 말하기", "Tap to speak")}</p>${err}
+    ${sp.tries >= 3 ? `<button class="big" data-act="spSkip">${TL("잘 안 들려요 · 건너뛰기", "It can't hear me · skip")}</button>` : ""}</div>`;
 }
 function listen() {
   const sp = TR.sp; if (!sp || sp.listening) return; const e = BY[TR.queue[0]]; const tg = sp.targets[sp.idx]; if (!tg) return;
@@ -951,14 +969,19 @@ function startCountdown() { stopAudio(); const id = TR.queue[0]; TR.step = "coun
 /* ---------- reminders (push) ---------- */
 window.__toast = msg => toast(msg);
 const pushOn = () => !!(ST && ST.push && ST.push.tokens && ST.push.tokens.length && WW.pushPermission() === "granted");
+const HOUR_KO = h => UI() === "en" ? (h < 12 ? h + " am" : h === 12 ? "12 pm" : (h - 12) + " pm") : (h < 12 ? "오전 " + h : h === 12 ? "낮 12" : "오후 " + (h - 12)) + "시";
+function timeChips() { // three dropdowns like the birthday picker: first time required, the other two optional
+  const t = ((ST.push && ST.push.times) || [17]).filter(h => h !== "" && h != null).map(Number); const st = 'style="min-height:52px;font:inherit;font-size:17px;border-radius:14px;border:2px solid var(--line);padding:0 8px;background:#fff;width:100%"';
+  const sel = i => `<select data-change="remTime" data-i="${i}" ${st} aria-label="Reminder ${i + 1}">${i ? '<option value="">' + TL("없음 · Off", "Off") + '</option>' : ""}${Array.from({ length: 17 }, (_, k) => k + 6).map(h => `<option value="${h}" ${t[i] === h ? "selected" : ""}>${HOUR_KO(h)}</option>`).join("")}</select>`;
+  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${sel(0)}${sel(1)}${sel(2)}</div><p class="muted small" style="margin:4px 0 0">${TL("하루 1~3번. 1 to 3 times a day.", "1 to 3 times a day.")}</p>`; }
 function pushCard() {
   const perm = WW.pushPermission(); const on = pushOn();
   let body;
-  if (on) body = `<p>🔔 Reminders are on: around <b>8am</b>, <b>5pm</b> and <b>8pm</b>.</p><button class="ghost" data-act="pushOn" style="align-self:flex-start">Re-connect reminders</button>`;
-  else if (perm === "unsupported" || !WW.standalone()) body = `<p class="muted">To get reminders on iPhone, open Vocaboo from its <b>home-screen icon</b> (not Safari), then tap the button here.</p>${perm !== "unsupported" ? `<button class="big primary" data-act="pushOn">Turn on reminders</button>` : ""}`;
+  if (on) body = `<p>${TL("알림이 켜져 있어요 · Reminders are on", "Reminders are on")}</p>${timeChips()}<button class="ghost" data-act="pushOn" style="align-self:flex-start">Re-connect reminders</button>`;
+  else if (perm === "unsupported" || !WW.standalone()) body = `<p class="muted">To get reminders on iPhone, open Vocaboo from its <b>home-screen icon</b> (not Safari), then tap the button here.</p>${timeChips()}${perm !== "unsupported" ? `<button class="big primary" data-act="pushOn">${TL("알림 켜기 · Turn on reminders", "Turn on reminders")}</button>` : ""}`;
   else if (perm === "denied") body = `<p class="muted">Notifications are blocked. On iPhone: <b>Settings → Notifications → Vocaboo → Allow Notifications</b>, then come back and tap below.</p><button class="big" data-act="pushOn">Try again</button>`;
-  else body = `<p class="muted">Get a friendly reminder in the morning, at 5pm and at 8pm.</p><button class="big primary" data-act="pushOn">Turn on reminders</button>`;
-  return `<div class="card"><h3>Reminders</h3>${body}</div>`;
+  else body = `<p class="muted">${TL("하루에 한 번, 골라 둔 시간에 알려 줘요. A friendly nudge at the times you choose.", "A friendly nudge at the times you choose.")}</p>${timeChips()}<button class="big primary" data-act="pushOn">${TL("알림 켜기 · Turn on reminders", "Turn on reminders")}</button>`;
+  return `<div class="card"><h3>${TL("알림 · Reminders", "Reminders")}</h3>${body}</div>`;
 }
 async function turnOnPush(btn) {
   if (btn) { btn.disabled = true; btn.textContent = "Turning on…"; }
@@ -966,7 +989,7 @@ async function turnOnPush(btn) {
     const token = await WW.enablePush();
     const times = (ST.push && ST.push.times) || [17]; // one gentle nudge a day by default; more in For parents
     ST.push = { tokens: [...new Set([token].concat((ST.push && ST.push.tokens) || []))].slice(0, 3), on: Date.now(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, times };
-    await saveST(); toast("알림이 켜졌어요 🔔"); sfx("pop"); render(); if (view.name === "setup") setTimeout(() => { SU++; OB_DIR = 1; render(); mascotNext(); }, 700);
+    await saveST(); toast(TL("알림이 켜졌어요 🔔", "Reminders are on 🔔")); sfx("pop"); render(); if (view.name === "setup") setTimeout(() => { SU++; OB_DIR = 1; render(); mascotNext(); }, 700);
   } catch (e) {
     const c = String(e && e.message || e);
     toast(c === "denied" ? "Notifications were not allowed" : c === "unsupported" ? "Open Vocaboo from the home-screen icon first" : c === "not-configured" ? "Reminders aren't set up yet (ask your teacher)" : "Couldn't turn on reminders: " + c);
@@ -975,13 +998,13 @@ async function turnOnPush(btn) {
 }
 
 /* fill-in-the-blank: clue on a wrong try, explanation after the right answer */
-function blankClue(q, e) { return `<div class="notice"><b>Not quite. Try again!${KO() ? " 다시 해 보세요!" : ""}</b></div>`; }
+function blankClue(q, e) { return `<div class="notice"><b>Not quite. Try again!${KO() && UI() !== "en" ? " 다시 해 보세요!" : ""}</b></div>`; }
 function blankExplain(e) { const re = new RegExp("\\b" + e.w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i"); const s = e.ex.find(x => re.test(x)) || e.ex[0];
   const ko = senseList(e)[0].ko, all = senseList(e).map(x => x.ko).join(" / ");
-  return `<div class="fb ${RUN.ok ? "good" : ""} stack" style="gap:8px;${RUN.ok ? "" : "background:var(--sun-soft);color:var(--sun-ink)"}"><span>${RUN.ok ? "✓ Correct on the first try!" + (KO() ? " 한 번에 맞혔어요!" : "") : "✓ You got it!" + (KO() ? " 맞혔어요!" : "")}</span>
+  return `<div class="fb ${RUN.ok ? "good" : ""} stack" style="gap:8px;${RUN.ok ? "" : "background:var(--sun-soft);color:var(--sun-ink)"}"><span>${RUN.ok ? "✓ Correct on the first try!" + (KO() && UI() !== "en" ? " 한 번에 맞혔어요!" : "") : "✓ You got it!" + (KO() && UI() !== "en" ? " 맞혔어요!" : "")}</span>
     <span style="font-weight:700">“${exHtml(s, e.w)}”</span>
     <span style="font-weight:600">🇺🇸 The answer is <b class="mono">${esc(e.w)}</b>. It means “${esc(e.def)}”, so it fits the sentence.</span>
-    ${KO() ? "" : "<!--"}<span style="font-weight:600">🇰🇷 정답은 <b class="mono">${esc(e.w)}</b>예요. ${senseList(e).length > 1 ? `‘${esc(all)}’라는 뜻이 있는데, 이 문장에서는 ‘${esc(ko)}’의 뜻으로 쓰여서 빈칸에 딱 맞아요.` : `‘${esc(ko)}’라는 뜻이라서 빈칸에 딱 맞아요.`}</span>${KO() ? "" : "-->"}</div>`; }
+    ${KO() && UI() !== "en" ? "" : "<!--"}<span style="font-weight:600">🇰🇷 정답은 <b class="mono">${esc(e.w)}</b>예요. ${senseList(e).length > 1 ? `‘${esc(all)}’라는 뜻이 있는데, 이 문장에서는 ‘${esc(ko)}’의 뜻으로 쓰여서 빈칸에 딱 맞아요.` : `‘${esc(ko)}’라는 뜻이라서 빈칸에 딱 맞아요.`}</span>${KO() && UI() !== "en" ? "" : "-->"}</div>`; }
 
 /* ---------- quiz v2: mixed directions, speaking, matching ---------- */
 Object.assign(TYPE_NAME, { blank_mc: "Fill in the blank (choose)", blank_ty: "Fill in the blank (type)", hear_ko: "Hear it → choose Korean", ctx_ko: "Word in a sentence → choose Korean", en_ko: "English → type Korean", match: "Match pairs", say_en: "Korean → say English", coach: "Own sentence (AI coach)", level: "Level check" });
@@ -1109,11 +1132,11 @@ function packSheet(ids, reason) {
   const firstDay = reason === "intro" && !(ST.week.trained || []).length; // only the first time a new set is opened
   if (!firstDay) return startTraining(ids, reason);
   const n = ST.week.newIds.length;
-  sheet(`<div style="display:flex;justify-content:center">${bubbo("wow", 100)}</div><h2 style="margin:0">이번 주 새 단어 ${n}개!</h2><p class="muted" style="margin:0">오늘은 그중 <b>${ids.length}개</b>부터. 처음 보는 단어가 많으면 바로 시작하고, 아는 단어가 많으면 먼저 확인해 보자.</p>
+  sheet(`<div style="display:flex;justify-content:center">${bubbo("wow", 100)}</div><h2 style="margin:0">${TL(`이번 주 새 단어 ${n}개!`, `${n} new words this week!`)}</h2><p class="muted" style="margin:0">${TL(`오늘은 그중 <b>${ids.length}개</b>부터. 처음 보는 단어가 많으면 바로 시작하고, 아는 단어가 많으면 먼저 확인해 보자.`, `Today, start with <b>${ids.length}</b>. If most are new, start right away. If you know many, check them first.`)}</p>
     <div class="chips" style="justify-content:center">${ids.map(id => `<span class="chip">${esc(BY[id].w)}</span>`).join("")}</div>
-    <button class="big primary" data-act="packLearn">바로 시작하기 →</button>
-    <button class="big" data-act="packCheck">아는 단어가 많아요 · 빠른 확인</button>
-    ${canTestOut() ? `<button class="ghost" data-act="sheetTestOut" style="font-size:13px">이번 주 단어가 다 너무 쉬워요? 더 어려운 단어 받기</button>` : ""}`);
+    <button class="big primary" data-act="packLearn">${TL("바로 시작하기 →", "Start now →")}</button>
+    <button class="big" data-act="packCheck">${TL("아는 단어가 많아요 · 빠른 확인", "I know many · quick check")}</button>
+    ${canTestOut() ? `<button class="ghost" data-act="sheetTestOut" style="font-size:13px">${TL("이번 주 단어가 다 너무 쉬워요? 더 어려운 단어 받기", "All too easy this week? Get harder words")}</button>` : ""}`);
 }
 function startPackCheck() {
   const pk = PACK_PENDING; closeSheet(); if (!pk) return;
@@ -1148,16 +1171,16 @@ function coachTarget() { const st = weekStage(); return st <= 1 ? 2 : st <= 3 ? 
 /* ---------- starred words: the student decides which words are tricky ---------- */
 const isStarred = id => !!(ST && ST.stars && ST.stars[id]);
 function starIds() { return Object.keys((ST && ST.stars) || {}).filter(id => BY[id]); }
-function toggleStar(id) { ST.stars = ST.stars || {}; if (ST.stars[id]) delete ST.stars[id]; else ST.stars[id] = Date.now(); saveST(); haptic("tap"); toast(ST.stars[id] ? "⭐ 헷갈리는 단어에 담았어" : "별표를 뺐어"); render(); }
-const starBtn = (id, cls) => `<button type="button" class="star-btn ${cls || ""}" data-act="star" data-id="${id}" aria-pressed="${isStarred(id)}" aria-label="헷갈리는 단어">${isStarred(id) ? "★" : "☆"}</button>`;
+function toggleStar(id) { ST.stars = ST.stars || {}; if (ST.stars[id]) delete ST.stars[id]; else ST.stars[id] = Date.now(); saveST(); haptic("tap"); toast(ST.stars[id] ? TL("⭐ 헷갈리는 단어에 담았어", "⭐ Added to tricky words") : TL("별표를 뺐어", "Star removed")); render(); }
+const starBtn = (id, cls) => `<button type="button" class="star-btn ${cls || ""}" data-act="star" data-id="${id}" aria-pressed="${isStarred(id)}" aria-label="${TL("헷갈리는 단어", "Tricky word")}">${isStarred(id) ? "★" : "☆"}</button>`;
 let FL = null;
 function flashSheet() {
   const wk = ST.week; const p = packInfo(); const week = p ? p.learnedIds.concat(wk.reviewIds) : weekIds();
   const all = [...new Set(Object.keys(WORDS).filter(id => BY[id]).concat(week))]; const tricky = starIds();
-  sheet(`<div style="display:flex;justify-content:center">${bubbo("happy", 90, null, "hold")}</div><h2>Flashcards</h2><p class="muted">카드를 눌러 뒤집고, 얼굴을 골라요: 또 보기 · 나중에 · 알았어!</p>
-    <button class="big primary" data-act="flStart" data-deck="week" ${week.length ? "" : "disabled"}>이번 주 단어 (${week.length})</button>
-    <button class="big" data-act="flStart" data-deck="tricky" ${tricky.length ? "" : "disabled"}>⭐ 헷갈리는 단어 (${tricky.length})</button>
-    <button class="big" data-act="flStart" data-deck="all" ${all.length ? "" : "disabled"}>내 단어 전부 (${all.length})</button><p class="muted small" style="text-align:center">단어 카드의 ☆을 누르면 헷갈리는 단어에 담겨요.</p>`);
+  sheet(`<div style="display:flex;justify-content:center">${bubbo("happy", 90, null, "hold")}</div><h2>Flashcards</h2><p class="muted">${TL("카드를 눌러 뒤집고, 얼굴을 골라요: 또 보기 · 나중에 · 알았어!", "Tap a card to flip it, then pick a face: again · later · got it!")}</p>
+    <button class="big primary" data-act="flStart" data-deck="week" ${week.length ? "" : "disabled"}>${TL(`이번 주 단어 (${week.length})`, `This week's words (${week.length})`)}</button>
+    <button class="big" data-act="flStart" data-deck="tricky" ${tricky.length ? "" : "disabled"}>${TL(`⭐ 헷갈리는 단어 (${tricky.length})`, `⭐ Tricky words (${tricky.length})`)}</button>
+    <button class="big" data-act="flStart" data-deck="all" ${all.length ? "" : "disabled"}>${TL(`내 단어 전부 (${all.length})`, `All my words (${all.length})`)}</button><p class="muted small" style="text-align:center">${TL("단어 카드의 ☆을 누르면 헷갈리는 단어에 담겨요.", "Tap ☆ on a word card to add it to tricky words.")}</p>`);
 }
 function startFlash(deck) {
   closeSheet(); const wk = ST.week; const p = packInfo();
@@ -1206,18 +1229,18 @@ function renderSetup() {
   const canPush = WW.pushPermission() !== "unsupported"; const ios = /iPhone|iPad/.test(navigator.userAgent); const installed = WW.standalone ? WW.standalone() : false;
   const per = Math.max(1, Math.ceil(n / STUDY_DAYS));
   const steps = [
-    { mood: "happy", q: "일주일에 새 단어<br>몇 개 배울까?", sub: "How many new words a week?", body: s.textbook ? `<p class="muted">Your teacher set your plan: <b>${n}</b> words a week.</p>`
-      : `<div class="goals">${[[10, "가볍게 · Easy"], [15, "딱 좋아 · Just right"], [20, "열심히 · Serious"], [30, "빡세게 · Intense"]].map(([v, l]) => `<button class="goal" data-act="suWords" data-v="${v}" aria-pressed="${s.grNew === v}"><b style="font-family:var(--f-display);font-size:22px;width:36px">${v}</b>${l}<span class="ck"></span></button>`).join("")}</div><p class="muted small">잘 모르겠으면 15! 나중에 For parents에서 바꿀 수 있어요.</p>` },
-    { hero: true, body: `<div class="ob-hero"><div class="mslot hero" data-sc="1.4" data-act="cheer" data-hold="1" data-key="count"></div><div class="big-num" style="animation:introIn .5s .2s both">${n}<small>words</small></div><div class="ob-q" style="animation:introIn .5s .35s both">첫 주에 단어 ${n}개!</div><p class="muted" style="animation:introIn .5s .5s both">하루 ${per}개씩 5일, 그리고 쉬는 날 2일. ${nm ? nm + ", " : ""}넌 할 수 있어!</p></div>` },
-    { mood: "wow", q: "매일 알림을<br>보내 줄까?", sub: "푸시 알림 한 번이면 끝. 메일은 보내지 않아요. 시간은 For parents에서 바꿀 수 있어요.", body: canPush ? (pushOn() ? `<div class="fb good">🔔 알림이 켜졌어요 · 매일 ${times.filter(h => h !== "" && h != null).map(hour).join(", ") || "5:00 pm"}</div>` : `<div class="goals"><button class="goal" data-act="pushOn" aria-pressed="false"><span style="font-size:22px">🔔</span>응, 알려 줘 (매일 5시)<span class="ck"></span></button><button class="goal" data-act="suNext" aria-pressed="false"><span style="font-size:22px">🤫</span>나중에 할게<span class="ck"></span></button></div>`) : `<p class="muted small">아이폰에서는 홈 화면에 추가한 뒤에 알림을 켤 수 있어요. 나중에 Me에서 켜 주세요.</p>` },
-    { mood: "think", q: "글자 크기는<br>어떤 게 편해?", sub: "Pick what's easiest to read.", body: textCard().replace('<div class="card">', '<div style="width:100%">').replace("<h3>Text size</h3>", "") },
-    { mood: "happy", q: "마이크가 잘 되는지<br>확인해 보자.", sub: "You'll practice saying words out loud.", body: `<div style="width:100%;text-align:left">${micCard().replace('<div class="card"', '<div')}</div><p class="muted small">You can skip this and test later in Me → Sound &amp; microphone.</p>` }]
-    .concat(installed ? [] : [{ mood: "wow", q: "홈 화면에<br>추가해 두면 편해!", sub: "Add Vocaboo to your home screen — it opens like an app.", body: `<div class="phone-mock"><div class="pm-row" style="width:60%"></div><div class="pm-row"></div><div class="pm-app">${bubbo("happy", 26)} Vocaboo</div><div class="pm-row" style="width:80%"></div><span class="pm-tap" style="right:14px;bottom:18px">${ios ? "⬆️" : "⋮"}</span></div>
-      <div class="steps-list">${(ios ? ["아래 공유 버튼 ⬆️ 을 눌러요", "“홈 화면에 추가”를 골라요", "오른쪽 위 “추가”를 눌러요"] : ["오른쪽 위 ⋮ 메뉴를 열어요", "“홈 화면에 추가” 또는 “앱 설치”를 골라요", "“설치”를 눌러요"]).map((t, i) => `<div class="st"><b>${i + 1}</b>${t}</div>`).join("")}</div>` }])
-    .concat([{ hero: true, body: `<div class="ob-hero"><div class="mslot hero" data-sc="1.4" data-act="wave" data-key="done"></div><div class="ob-q" style="animation:introIn .5s .25s both">준비 완료! 🎉</div><p class="muted" style="animation:introIn .5s .4s both">매일 단어 몇 개, 짧은 퀴즈, 그리고 말하기 연습. 작은 걸음이 모여 큰 실력이 돼요.</p></div>` }]);
+    { mood: "happy", q: TL("일주일에 새 단어<br>몇 개 배울까?", "How many new words<br>a week?"), sub: UI() === "en" ? "" : "How many new words a week?", body: s.textbook ? `<p class="muted">Your teacher set your plan: <b>${n}</b> words a week.</p>`
+      : `<div class="goals">${[[10, "가볍게 · Easy"], [15, "딱 좋아 · Just right"], [20, "열심히 · Serious"], [30, "빡세게 · Intense"]].map(([v, l]) => `<button class="goal" data-act="suWords" data-v="${v}" aria-pressed="${s.grNew === v}"><b style="font-family:var(--f-display);font-size:22px;width:36px">${v}</b>${TL(l, l.split(" · ")[1])}<span class="ck"></span></button>`).join("")}</div><p class="muted small">${TL("잘 모르겠으면 15! 나중에 For parents에서 바꿀 수 있어요.", "Not sure? Pick 15. You can change it later in For parents.")}</p>` },
+    { hero: true, body: `<div class="ob-hero"><div class="mslot hero" data-sc="1.4" data-act="cheer" data-hold="1" data-key="count"></div><div class="big-num" style="animation:introIn .5s .2s both">${n}<small>words</small></div><div class="ob-q" style="animation:introIn .5s .35s both">${TL(`첫 주에 단어 ${n}개!`, `${n} words in your first week!`)}</div><p class="muted" style="animation:introIn .5s .5s both">${TL(`하루 ${per}개씩 5일, 그리고 쉬는 날 2일. ${nm ? nm + ", " : ""}넌 할 수 있어!`, `${per} a day for 5 days, then 2 days off. ${nm ? nm + ", y" : "Y"}ou can do it!`)}</p></div>` },
+    { mood: "wow", q: TL("매일 알림을<br>보내 줄까?", "Shall I send you<br>a daily reminder?"), sub: TL("푸시 알림만 보내요. 메일은 없어요. 시간은 나중에 Me에서 바꿀 수 있어요.", "Only push notifications, no email. You can change the time later in Me."), body: canPush ? (pushOn() ? `<div class="fb good">${TL("알림이 켜졌어요", "Reminders are on")} · ${times.filter(h => h !== "" && h != null).map(h => HOUR_KO(+h)).join(", ") || HOUR_KO(17)}</div>` : `<p class="small" style="margin:0 0 6px;font-weight:700">${TL("언제 알려 줄까?", "When should I remind you?")}</p>${timeChips()}<div class="goals" style="margin-top:10px"><button class="goal" data-act="pushOn" aria-pressed="false"><span style="font-size:22px">🔔</span>${TL("응, 이 시간에 알려 줘", "Yes, remind me then")}<span class="ck"></span></button><button class="goal" data-act="suNext" aria-pressed="false"><span style="font-size:22px">🤫</span>${TL("나중에 할게", "Maybe later")}<span class="ck"></span></button></div>`) : `<p class="muted small">${TL("아이폰에서는 홈 화면에 추가한 뒤에 알림을 켤 수 있어요. 나중에 Me에서 켜 주세요.", "On iPhone, add Vocaboo to your home screen first, then turn on reminders in Me.")}</p>` },
+    { mood: "think", q: TL("글자 크기는<br>어떤 게 편해?", "Which text size<br>is easiest to read?"), sub: UI() === "en" ? "" : "Pick what's easiest to read.", body: textCard().replace('<div class="card">', '<div style="width:100%">').replace("<h3>Text size</h3>", "") },
+    { mood: "happy", q: TL("마이크가 잘 되는지<br>확인해 보자.", "Let's check that<br>the mic works."), sub: "You'll practice saying words out loud.", body: `<div style="width:100%;text-align:left">${micCard().replace('<div class="card"', '<div')}</div><p class="muted small">You can skip this and test later in Me → Sound &amp; microphone.</p>` }]
+    .concat(installed ? [] : [{ mood: "wow", q: TL("홈 화면에<br>추가해 두면 편해!", "Put me on your<br>home screen!"), sub: TL("Add Vocaboo to your home screen — it opens like an app.", "It opens like an app."), body: `<div class="phone-mock"><div class="pm-row" style="width:60%"></div><div class="pm-row"></div><div class="pm-app">${bubbo("happy", 26)} Vocaboo</div><div class="pm-row" style="width:80%"></div><span class="pm-tap" style="right:14px;bottom:18px">${ios ? "⬆️" : "⋮"}</span></div>
+      <div class="steps-list">${(ios ? TL(["아래 공유 버튼 ⬆️ 을 눌러요", "“홈 화면에 추가”를 골라요", "오른쪽 위 “추가”를 눌러요"], ["Tap the share button ⬆️ at the bottom", "Choose “Add to Home Screen”", "Tap “Add” at the top right"]) : TL(["오른쪽 위 ⋮ 메뉴를 열어요", "“홈 화면에 추가” 또는 “앱 설치”를 골라요", "“설치”를 눌러요"], ["Open the ⋮ menu at the top right", "Choose “Add to Home screen” or “Install app”", "Tap “Install”"])).map((t, i) => `<div class="st"><b>${i + 1}</b>${t}</div>`).join("")}</div>` }])
+    .concat([{ hero: true, body: `<div class="ob-hero"><div class="mslot hero" data-sc="1.4" data-act="wave" data-key="done"></div><div class="ob-q" style="animation:introIn .5s .25s both">${TL("준비 완료! 🎉", "All set! 🎉")}</div><p class="muted" style="animation:introIn .5s .4s both">${TL("매일 단어 몇 개, 짧은 퀴즈, 그리고 말하기 연습. 작은 걸음이 모여 큰 실력이 돼요.", "A few words a day, a short quiz, and some speaking. Small steps add up.")}</p></div>` }]);
   SU = Math.max(0, Math.min(steps.length - 1, SU)); const st = steps[SU]; const last = SU === steps.length - 1;
   const body = st.hero ? st.body : obAsk(st.mood, st.q, st.sub) + st.body;
-  $app.innerHTML = obShell({ back: SU ? "suBack" : "", pct: (SU + 1) / steps.length * 100, body, act: last ? "suDone" : "suNext", btn: last ? "시작하자! 🚀" : "계속 →", disabled: SU === 0 && !s.textbook && !s.grNew });
+  $app.innerHTML = obShell({ back: SU ? "suBack" : "", pct: (SU + 1) / steps.length * 100, body, act: last ? "suDone" : "suNext", btn: last ? TL("시작하자! 🚀", "Let's start! 🚀") : TLK("next"), disabled: SU === 0 && !s.textbook && !s.grNew });
 }
 function suWords(v) { const s = Object.assign({}, ST.settings || {}); s.grNew = v; ST.settings = s; ST.planBy = { at: Date.now(), who: "setup" };
   const wk = ST.week; if (wk && !(wk.trained || []).length) { buildWeek(ST, WORDS, effCfg(ST), true); delete ST.week.day; loadPacksFor(weekIds()); } // first week not started: use the new number now
@@ -1295,7 +1318,7 @@ function weekCardSheet(which) {
   const hasLast = (ST.history || []).length > 0;
   sheet(`<h2 style="margin:0">📸 Weekly card</h2>${hasLast ? `<div class="seg" style="width:100%"><button data-act="cardWhich" data-w="this" aria-pressed="${CARD_WHICH === "this"}" style="flex:1">This week</button><button data-act="cardWhich" data-w="last" aria-pressed="${CARD_WHICH === "last"}" style="flex:1">Last week</button></div>` : ""}
     <img src="${url}" alt="Weekly summary card" style="width:100%;border-radius:18px;box-shadow:var(--shadow)">
-    <button class="big primary" data-act="cardShare">📤 Share or save</button><p class="muted small">Share it with family on KakaoTalk or post it to your Instagram story! 가족에게 보내거나 인스타그램에 올려 보세요.</p>`);
+    <button class="big primary" data-act="cardShare">📤 Share or save</button><p class="muted small">Share it with family on KakaoTalk or post it to your Instagram story!${TL(" 가족에게 보내거나 인스타그램에 올려 보세요.", "")}</p>`);
 }
 async function shareWeekCard() {
   const S = weekSummary(CARD_WHICH); const c = drawWeekCard(S);
@@ -1336,7 +1359,7 @@ Reply with ONLY a compact JSON object, no markdown, keep every string short:
  "praise": "ONE short, warm, SPECIFIC sentence about something good in her sentence (max 12 words). Vary the wording; never just 'Great sentence'",
  "level_up": "a more advanced version of HER corrected sentence that keeps her idea and the target word but adds one thing: a describing word, a reason (because/so), a time or place phrase, or a stronger verb. Natural, max 14 words",
  "level_up_tip": "what made it better, max 8 words",
-${KO() ? ` "why_ko": "one short friendly Korean sentence (존댓말) saying what was wrong and why, or what was good if correct"` : ` "why_ko": "one short, very simple English sentence saying what was wrong and why, or what was good if correct"`}}`;
+${KO() && UI() !== "en" ? ` "why_ko": "one short friendly Korean sentence (존댓말) saying what was wrong and why, or what was good if correct"` : ` "why_ko": "one short, very simple English sentence saying what was wrong and why, or what was good if correct"`}}`;
 }
 async function coachCheck() {
   const e = BY[CO.ids[CO.i]]; const s = (document.getElementById("coachText") || {}).value || CO.text; CO.text = s.trim();
@@ -1395,7 +1418,7 @@ function coachListen() {
   quiet = setTimeout(end, 9000);
   try { rec.start(); } catch (err) { CO.listening = false; CO.err = "unsupported"; render(); }
 }
-const COACH_OPEN = ["<b>{w}</b>로 문장을 하나 말해 볼까? 네 이야기로 만들면 더 좋아!", "이번엔 <b>{w}</b>! 오늘 있었던 일로 문장을 만들어 봐.", "<b>{w}</b>를 넣어서 한 문장만 말해 줘. 짧아도 괜찮아!", "자, <b>{w}</b>. 이 단어로 뭘 말하고 싶어?", "<b>{w}</b>로 문장 만들기! 어려우면 아래 도움 버튼을 눌러."];
+const COACH_OPEN = [["<b>{w}</b>로 문장을 하나 말해 볼까? 네 이야기로 만들면 더 좋아!", "Can you say a sentence with <b>{w}</b>? Even better if it's about you."], ["이번엔 <b>{w}</b>! 오늘 있었던 일로 문장을 만들어 봐.", "Now <b>{w}</b>! Make a sentence about something from today."], ["<b>{w}</b>를 넣어서 한 문장만 말해 줘. 짧아도 괜찮아!", "Give me one sentence with <b>{w}</b>. Short is fine!"], ["자, <b>{w}</b>. 이 단어로 뭘 말하고 싶어?", "OK, <b>{w}</b>. What do you want to say with it?"], ["<b>{w}</b>로 문장 만들기! 어려우면 아래 도움 버튼을 눌러.", "Sentence time with <b>{w}</b>! If it's hard, tap a help button below."]];
 function coachStarters(e) { const w = e.w; const pos = (e.pos || "").toLowerCase();
   if (/^v/.test(pos)) return ["I want to " + w + " …", "Yesterday I " + w + "ed …", "My friend likes to " + w + " …"];
   if (/^adj/.test(pos)) return ["My … is very " + w + ".", "It was so " + w + " that …", "I feel " + w + " when …"];
@@ -1403,42 +1426,42 @@ function coachStarters(e) { const w = e.w; const pos = (e.pos || "").toLowerCase
   return ["I have a " + w + " …", "My favorite " + w + " is …", "There is a " + w + " in …"]; }
 function coachHelp(kind) { const e = BY[CO.ids[CO.i]]; CO.help = CO.help || [];
   if (kind === "meaning") CO.help.push({ mood: "happy", html: `<b>${esc(e.w)}</b> = <b>${esc(senseList(e).map(sgloss).join(" / "))}</b>${e.ipa ? ` <span class="muted small">${esc(e.ipa)}</span>` : ""}<br><span class="muted small">${esc(senseList(e)[0].def || "")}</span>` });
-  else if (kind === "example") { const ex = e.ex[(CO.help.filter(h => h.k === "example").length) % e.ex.length]; CO.help.push({ k: "example", mood: "happy", html: `예를 들면: <b>${exHtml(ex, e.w)}</b> <button class="ghost" data-act="say" data-text="${esc(ex)}" style="min-height:28px;padding:0 8px;font-size:13px;display:inline-flex;align-items:center;gap:4px">${ICON_SPK.replace("<svg", '<svg width="14" height="14"')} 듣기</button><br><span class="muted small">이 문장 말고, 네 이야기로 바꿔서 말해 봐!</span>` }); }
-  else if (kind === "hint") CO.help.push({ mood: "think", html: `이렇게 시작해 볼래?<br>${coachStarters(e).map(x => `<b>“${esc(x)}”</b>`).join("<br>")}<br><span class="muted small">빈칸은 네 생각으로 채워 봐.</span>` });
+  else if (kind === "example") { const ex = e.ex[(CO.help.filter(h => h.k === "example").length) % e.ex.length]; CO.help.push({ k: "example", mood: "happy", html: `${TL("예를 들면:", "For example:")} <b>${exHtml(ex, e.w)}</b> <button class="ghost" data-act="say" data-text="${esc(ex)}" style="min-height:28px;padding:0 8px;font-size:13px;display:inline-flex;align-items:center;gap:4px">${ICON_SPK.replace("<svg", '<svg width="14" height="14"')} ${TLK("listen")}</button><br><span class="muted small">${TL("이 문장 말고, 네 이야기로 바꿔서 말해 봐!", "Don't copy it. Change it into your own story!")}</span>` }); }
+  else if (kind === "hint") CO.help.push({ mood: "think", html: `${TL("이렇게 시작해 볼래?", "Want to start like this?")}<br>${coachStarters(e).map(x => `<b>“${esc(x)}”</b>`).join("<br>")}<br><span class="muted small">${TL("빈칸은 네 생각으로 채워 봐.", "Fill in the blanks with your own ideas.")}</span>` });
   render(); }
 function coachMsg(mood, html) { return `<div class="msg">${bubbo(mood, 40)}<div class="bub">${html}</div></div>`; }
-function meMsg(text, vkey) { return `<div class="msg me"><div class="bub">${vkey && voiceHas(vkey) ? `<div class="meta"><button type="button" class="play-sm" data-act="playMine" data-key="${esc(vkey)}" aria-label="내 목소리 듣기">${I.play}</button>내 목소리</div>` : ""}${esc(text)}</div></div>`; }
+function meMsg(text, vkey) { return `<div class="msg me"><div class="bub">${vkey && voiceHas(vkey) ? `<div class="meta"><button type="button" class="play-sm" data-act="playMine" data-key="${esc(vkey)}" aria-label="${TL("내 목소리 듣기", "Play my voice")}">${I.play}</button>${TLK("myVoice")}</div>` : ""}${esc(text)}</div></div>`; }
 function renderCoach() {
   const e = BY[CO.ids[CO.i]]; const r = CO.res; const chat = [];
-  if (!CO.opener || CO.openerFor !== CO.i) { CO.opener = pickOne(COACH_OPEN).replace("{w}", esc(e.w)); CO.openerFor = CO.i; }
-  chat.push(coachMsg("happy", `${CO.opener}<div class="muted small" style="margin-top:4px">${esc(senseList(e).map(sgloss).join(" / "))}</div>`));
+  if (!CO.opener || CO.openerFor !== CO.i) { CO.opener = pickOne(COACH_OPEN); CO.openerFor = CO.i; }
+  chat.push(coachMsg("happy", `${TL(CO.opener[0], CO.opener[1]).replace("{w}", esc(e.w))}<div class="muted small" style="margin-top:4px">${esc(senseList(e).map(sgloss).join(" / "))}</div>`));
   (CO.help || []).forEach(h => chat.push(coachMsg(h.mood, h.html)));
   let foot = "";
   if (CO.busy) { chat.push(meMsg(CO.text, CO.vkey)); chat.push(coachMsg("think", `<span class="typing"><i></i><i></i><i></i></span>`)); }
   else if (r && !r.error && !r.offline) {
     chat.push(meMsg(CO.text, CO.vkey));
-    const fixed = r.correct ? "" : `<div class="card ink" style="padding:12px 14px;gap:8px;margin-top:8px"><div style="font-size:17px;line-height:1.65">${esc(r.fixed)}</div>${r.why_ko ? `<div class="small" style="color:var(--muted);border-top:1px solid var(--line);padding-top:8px">${esc(r.why_ko)}</div>` : ""}<div class="row"><button class="ghost" data-act="say" data-text="${esc(r.fixed)}" style="min-height:32px;display:inline-flex;align-items:center;gap:6px">${ICON_SPK.replace("<svg", '<svg width="16" height="16"')} 듣기</button></div></div>`;
-    chat.push(coachMsg(r.correct ? "cheer" : "happy", `<b>${esc(CO.head || (r.correct ? "완벽한 문장이야! 🌟" : "좋은 시도야! 💪"))}</b>${r.praise ? `<br><span>${esc(r.praise)}</span>` : ""}${fixed}`));
-    if (r.level_up) chat.push(coachMsg("wow", `<div class="eyebrow" style="font-size:11px">LEVEL UP · 한 단계 더</div><div style="font-size:16px;margin-top:2px">${exHtml(r.level_up, e.w)}</div>${r.level_up_tip ? `<div class="muted small" style="margin-top:4px">💡 ${esc(r.level_up_tip)}</div>` : ""}<div class="row"><button class="ghost" data-act="say" data-text="${esc(r.level_up)}" style="min-height:32px;display:inline-flex;align-items:center;gap:6px">${ICON_SPK.replace("<svg", '<svg width="16" height="16"')} 듣기</button></div>`));
-    else if (r.another) chat.push(coachMsg("happy", `이렇게도 말할 수 있어: <b>${exHtml(r.another, e.w)}</b>`));
-    if (!CO.sayOk) { chat.push(coachMsg("wow", `이제 이 문장을 소리 내어 읽어 봐:<br><b>${esc(CO.sayTarget || "")}</b>${CO.sayHeard ? `<div class="fb ${CO.sayOk ? "good" : "bad"}" style="margin-top:8px;padding:8px 12px;font-size:14px">${esc(CO.sayHeard)}</div>` : ""}`));
-      foot = `<div class="row" style="gap:8px"><button class="ghost" data-act="say" data-text="${esc(CO.sayTarget || "")}" style="min-height:36px;display:inline-flex;align-items:center;gap:6px">${ICON_SPK.replace("<svg", '<svg width="16" height="16"')} 듣기</button><button class="ghost" data-act="coachRetry" style="min-height:36px">새 문장</button>${CO.sayTries >= 3 ? `<button class="ghost" data-act="coachSaySkip" style="min-height:36px">건너뛰기</button>` : ""}</div>
-        <div class="row between" style="flex-wrap:nowrap"><span class="muted small">${CO.sayListening ? "듣고 있어요… 문장 전체를 읽어요" : "눌러서 읽기"}</span><button class="mic ${CO.sayListening ? "on" : ""}" data-act="coachSay" ${CO.sayListening ? "disabled" : ""} aria-label="Tap, then read" style="width:64px;height:64px;min-height:64px;align-self:auto">${ICON_MIC}</button></div>`; }
-    else { chat.push(coachMsg("cheer", `잘 읽었어! ${CO.i + 1 < CO.ids.length ? "다음 단어로 가자." : "오늘 문장 연습 끝!"}`));
-      foot = `<div class="row"><button class="big" data-act="coachRetry" style="flex:1">새 문장</button><button class="big primary" data-act="coachNext" style="flex:1.4" id="nextBtn">${CO.i + 1 < CO.ids.length ? "다음 단어 →" : "완료 🎉"}</button></div>`; }
+    const fixed = r.correct ? "" : `<div class="card ink" style="padding:12px 14px;gap:8px;margin-top:8px"><div style="font-size:17px;line-height:1.65">${esc(r.fixed)}</div>${r.why_ko ? `<div class="small" style="color:var(--muted);border-top:1px solid var(--line);padding-top:8px">${esc(r.why_ko)}</div>` : ""}<div class="row"><button class="ghost" data-act="say" data-text="${esc(r.fixed)}" style="min-height:32px;display:inline-flex;align-items:center;gap:6px">${ICON_SPK.replace("<svg", '<svg width="16" height="16"')} ${TLK("listen")}</button></div></div>`;
+    chat.push(coachMsg(r.correct ? "cheer" : "happy", `<b>${esc(CO.head || (r.correct ? TL("완벽한 문장이야! 🌟", "Perfect sentence! 🌟") : TL("좋은 시도야! 💪", "Good try! 💪")))}</b>${r.praise ? `<br><span>${esc(r.praise)}</span>` : ""}${fixed}`));
+    if (r.level_up) chat.push(coachMsg("wow", `<div class="eyebrow" style="font-size:11px">${TL("LEVEL UP · 한 단계 더", "LEVEL UP")}</div><div style="font-size:16px;margin-top:2px">${exHtml(r.level_up, e.w)}</div>${r.level_up_tip ? `<div class="muted small" style="margin-top:4px">💡 ${esc(r.level_up_tip)}</div>` : ""}<div class="row"><button class="ghost" data-act="say" data-text="${esc(r.level_up)}" style="min-height:32px;display:inline-flex;align-items:center;gap:6px">${ICON_SPK.replace("<svg", '<svg width="16" height="16"')} ${TLK("listen")}</button></div>`));
+    else if (r.another) chat.push(coachMsg("happy", `${TL("이렇게도 말할 수 있어:", "You could also say:")} <b>${exHtml(r.another, e.w)}</b>`));
+    if (!CO.sayOk) { chat.push(coachMsg("wow", `${TL("이제 이 문장을 소리 내어 읽어 봐:", "Now read this sentence out loud:")}<br><b>${esc(CO.sayTarget || "")}</b>${CO.sayHeard ? `<div class="fb ${CO.sayOk ? "good" : "bad"}" style="margin-top:8px;padding:8px 12px;font-size:14px">${esc(CO.sayHeard)}</div>` : ""}`));
+      foot = `<div class="row" style="gap:8px"><button class="ghost" data-act="say" data-text="${esc(CO.sayTarget || "")}" style="min-height:36px;display:inline-flex;align-items:center;gap:6px">${ICON_SPK.replace("<svg", '<svg width="16" height="16"')} ${TLK("listen")}</button><button class="ghost" data-act="coachRetry" style="min-height:36px">${TLK("newSentence")}</button>${CO.sayTries >= 3 ? `<button class="ghost" data-act="coachSaySkip" style="min-height:36px">${TL("건너뛰기", "Skip")}</button>` : ""}</div>
+        <div class="row between" style="flex-wrap:nowrap"><span class="muted small">${CO.sayListening ? TL("듣고 있어요… 문장 전체를 읽어요", "Listening… read the whole sentence") : TL("눌러서 읽기", "Tap to read")}</span><button class="mic ${CO.sayListening ? "on" : ""}" data-act="coachSay" ${CO.sayListening ? "disabled" : ""} aria-label="Tap, then read" style="width:64px;height:64px;min-height:64px;align-self:auto">${ICON_MIC}</button></div>`; }
+    else { chat.push(coachMsg("cheer", `${TL("잘 읽었어!", "Nicely read!")} ${CO.i + 1 < CO.ids.length ? TL("다음 단어로 가자.", "On to the next word.") : TL("오늘 문장 연습 끝!", "Sentence practice done for today!")}`));
+      foot = `<div class="row"><button class="big" data-act="coachRetry" style="flex:1">${TLK("newSentence")}</button><button class="big primary" data-act="coachNext" style="flex:1.4" id="nextBtn">${CO.i + 1 < CO.ids.length ? TL("다음 단어 →", "Next word →") : TL("완료 🎉", "Done 🎉")}</button></div>`; }
   } else {
-    if (r && (r.error || r.offline)) chat.push(coachMsg("sad", `지금은 코치가 쉬고 있어${r.error ? " (" + esc(r.error) + ")" : ""}. 네 문장은 선생님께 저장했어.`));
-    if (CO.listening) chat.push(coachMsg("wow", "듣고 있어… 다 말하면 잠깐 기다려 줘."));
+    if (r && (r.error || r.offline)) chat.push(coachMsg("sad", TL(`지금은 코치가 쉬고 있어${r.error ? " (" + esc(r.error) + ")" : ""}. 네 문장은 선생님께 저장했어.`, `The coach is resting right now${r.error ? " (" + esc(r.error) + ")" : ""}. Your sentence was saved for your teacher.`)));
+    if (CO.listening) chat.push(coachMsg("wow", TL("듣고 있어… 다 말하면 잠깐 기다려 줘.", "Listening… when you're done, wait a moment.")));
     else if (CO.text) chat.push(meMsg(CO.text, CO.vkey));
-    if (CO.err === "blocked") chat.push(coachMsg("think", micBlockedHtml("아래에 직접 써도 돼.")));
-    const chips = !CO.text && !CO.listening ? `<div class="row" style="gap:6px;flex-wrap:wrap"><button class="chip-btn" data-act="coachHelp" data-k="meaning">🤔 뜻이 뭐였지?</button><button class="chip-btn" data-act="coachHelp" data-k="example">📝 예문 보여 줘</button><button class="chip-btn" data-act="coachHelp" data-k="hint">💡 시작 힌트</button><button class="chip-btn" data-act="coachSkipWord">⏭ 다른 단어</button></div>` : "";
-    foot = `${chips}${CO.text && !CO.listening ? `<div class="row" style="gap:8px"><button class="ghost" data-act="coachRedo" style="min-height:36px">다시 말하기</button><button class="ghost" data-act="coachType" style="min-height:36px">고치기</button></div>` : ""}
-      ${CO.typing || (!SR) ? `<textarea id="coachText" rows="2" placeholder="문장을 써도 돼요" style="font:inherit;font-size:17px;padding:12px 14px;border-radius:16px;border:1.5px solid var(--line);width:100%;resize:vertical">${esc(CO.text)}</textarea>` : `<input id="coachText" type="hidden" value="${esc(CO.text)}">`}
-      <div class="row between" style="flex-wrap:nowrap"><span class="muted small">${CO.listening ? "듣고 있어요…" : CO.text ? "" : "눌러서 문장 말하기"}${!CO.typing && !CO.text && !CO.listening ? ` · <button class="ghost" data-act="coachType" style="min-height:24px;padding:0;font-size:13px">타이핑</button>` : ""}</span>
-        ${CO.text && !CO.listening ? `<button class="big primary" data-act="coachCheck" style="width:auto;padding:0 22px;min-height:56px">확인 →</button>` : `<button class="mic ${CO.listening ? "on" : ""}" data-act="coachMic" ${CO.listening ? "disabled" : ""} aria-label="Tap, then speak" style="width:64px;height:64px;min-height:64px;align-self:auto">${ICON_MIC}</button>`}</div>
-      ${r && (r.error || r.offline) ? `<button class="ghost" data-act="coachNext" style="align-self:center">다음 단어로 건너뛰기</button>` : ""}`;
+    if (CO.err === "blocked") chat.push(coachMsg("think", micBlockedHtml(TL("아래에 직접 써도 돼.", "You can also type below."))));
+    const chips = !CO.text && !CO.listening ? `<div class="row" style="gap:6px;flex-wrap:wrap"><button class="chip-btn" data-act="coachHelp" data-k="meaning">${TL("🤔 뜻이 뭐였지?", "🤔 What did it mean?")}</button><button class="chip-btn" data-act="coachHelp" data-k="example">${TL("📝 예문 보여 줘", "📝 Show an example")}</button><button class="chip-btn" data-act="coachHelp" data-k="hint">${TL("💡 시작 힌트", "💡 Starter hint")}</button><button class="chip-btn" data-act="coachSkipWord">${TL("⏭ 다른 단어", "⏭ Another word")}</button></div>` : "";
+    foot = `${chips}${CO.text && !CO.listening ? `<div class="row" style="gap:8px"><button class="ghost" data-act="coachRedo" style="min-height:36px">${TL("다시 말하기", "Say it again")}</button><button class="ghost" data-act="coachType" style="min-height:36px">${TL("고치기", "Fix it")}</button></div>` : ""}
+      ${CO.typing || (!SR) ? `<textarea id="coachText" rows="2" placeholder="${TL("문장을 써도 돼요", "You can type your sentence")}" style="font:inherit;font-size:17px;padding:12px 14px;border-radius:16px;border:1.5px solid var(--line);width:100%;resize:vertical">${esc(CO.text)}</textarea>` : `<input id="coachText" type="hidden" value="${esc(CO.text)}">`}
+      <div class="row between" style="flex-wrap:nowrap"><span class="muted small">${CO.listening ? TLK("listening") : CO.text ? "" : TL("눌러서 문장 말하기", "Tap to say a sentence")}${!CO.typing && !CO.text && !CO.listening ? ` · <button class="ghost" data-act="coachType" style="min-height:24px;padding:0;font-size:13px">${TL("타이핑", "Type")}</button>` : ""}</span>
+        ${CO.text && !CO.listening ? `<button class="big primary" data-act="coachCheck" style="width:auto;padding:0 22px;min-height:56px">${TL("확인 →", "Check →")}</button>` : `<button class="mic ${CO.listening ? "on" : ""}" data-act="coachMic" ${CO.listening ? "disabled" : ""} aria-label="Tap, then speak" style="width:64px;height:64px;min-height:64px;align-self:auto">${ICON_MIC}</button>`}</div>
+      ${r && (r.error || r.offline) ? `<button class="ghost" data-act="coachNext" style="align-self:center">${TL("다음 단어로 건너뛰기", "Skip to the next word")}</button>` : ""}`;
   }
-  $app.innerHTML = `<div class="topbar"><button class="x" data-act="quit" aria-label="Stop">${I.x}</button><div class="stack" style="gap:0;flex:1"><b>Bubbo랑 문장 만들기</b><span class="eyebrow" style="font-size:11px">WORD: ${esc(e.w).toUpperCase()} · ${CO.i + 1} OF ${CO.ids.length}</span></div>${spk(e.id, "w")}</div>
+  $app.innerHTML = `<div class="topbar"><button class="x" data-act="quit" aria-label="Stop">${I.x}</button><div class="stack" style="gap:0;flex:1"><b>${TL("Bubbo랑 문장 만들기", "Sentences with Bubbo")}</b><span class="eyebrow" style="font-size:11px">WORD: ${esc(e.w).toUpperCase()} · ${CO.i + 1} OF ${CO.ids.length}</span></div>${spk(e.id, "w")}</div>
     <div class="chat" id="coachChat" style="flex:1;padding-bottom:${CO.typing ? 230 : 170}px">${chat.join("")}</div>
     <div class="stack coach-foot" style="gap:10px">${foot}</div>`;
   const ta = document.getElementById("coachText"); if (ta && CO.typing && ta.tagName === "TEXTAREA") ta.focus();
@@ -1535,7 +1558,7 @@ Reply with ONLY JSON, no markdown: ${KO() ? `{"en": "...", "ko": "natural Korean
 async function extendStory(data) { // new chapter when 3+ more words were learned since the story was written
   try { if (!WW.ask || !data || data.prepKey != null || !data.parts || data.parts.length >= 8) return data; const have = new Set(data.words || []); const fresh = storyWordIds().filter(id => !have.has(id));
     if (fresh.length < 3) return data; const raw = await WW.ask(storyMorePrompt(data, fresh)); const m = raw.match(/\{[\s\S]*\}/); const part = JSON.parse(m ? m[0] : raw); if (!part || !part.en) return data;
-    data.parts = data.parts.concat([part]); data.words = (data.words || []).concat(fresh); data.needsAudio = true; data.grown = Date.now(); delete data.audio; await setDoc(storyPath(), data); ST.storyAudioPending = weekKey(); saveST(); toast("📖 새 이야기 부분이 추가됐어!"); }
+    data.parts = data.parts.concat([part]); data.words = (data.words || []).concat(fresh); data.needsAudio = true; data.grown = Date.now(); delete data.audio; await setDoc(storyPath(), data); ST.storyAudioPending = weekKey(); saveST(); toast(TL("📖 새 이야기 부분이 추가됐어!", "📖 A new part was added to your story!")); }
   catch (e) { console.warn("extendStory", e); } return data; }
 function storyPrompt(ids) {
   const list = ids.map(id => `${BY[id].w} (${senseList(BY[id]).map(s => KO() ? s.ko : s.def).join(" / ")})`).join("; ");
@@ -1626,7 +1649,7 @@ function renderStory() {
       ${after && (!KO() || !P.ko) ? "" : after ? (S.showKo[S.part] ? `<p class="muted story-ko">${esc(P.ko)}</p><button class="ghost" data-act="toggleKo" data-i="${S.part}" style="align-self:flex-start">Hide Korean</button>` : `<button class="ghost" data-act="toggleKo" data-i="${S.part}" style="align-self:flex-start">Show Korean</button>`) : `<p class="muted small">Tap a highlighted word to hear it and see what it means in English.</p>`}</div>
     ${after ? `<button class="big primary" data-act="storyNextPart">${S.part + 1 < nParts ? "Next part →" : "Finish the story"}</button>`
       : `<button class="big primary" data-act="storyQs">I read it · answer ${P.questions.length} question${P.questions.length === 1 ? "" : "s"}</button>`}`;
-  if (S.dictAsk) { const el = document.createElement("div"); el.className = "cel"; el.innerHTML = `<div class="cel-card"><div class="cel-icon">🎤</div><h2>Bonus: read it out loud!</h2><p class="muted">Read Part ${S.part + 1} out loud from beginning to end. The app follows along and checks your reading. Earn up to +15 XP.</p>${KO() ? `<p class="muted small">이 부분을 처음부터 끝까지 소리 내어 읽어 보세요!</p>` : ""}<button class="big primary" data-act="readYes">Yes, let's read!</button><button class="big" data-act="dictNo">Skip</button></div>`; $app.appendChild(el); }
+  if (S.dictAsk) { const el = document.createElement("div"); el.className = "cel"; el.innerHTML = `<div class="cel-card"><div class="cel-icon">🎤</div><h2>Bonus: read it out loud!</h2><p class="muted">Read Part ${S.part + 1} out loud from beginning to end. The app follows along and checks your reading. Earn up to +15 XP.</p>${KO() && UI() !== "en" ? `<p class="muted small">이 부분을 처음부터 끝까지 소리 내어 읽어 보세요!</p>` : ""}<button class="big primary" data-act="readYes">Yes, let's read!</button><button class="big" data-act="dictNo">Skip</button></div>`; $app.appendChild(el); }
 }
 function storyPick(k) { const S = STORY; const q = S.data.parts[S.part].questions[S.qi]; S.picked = k; const ok = k === q.answer; if (ok) { S.right++; award(5, "story q"); } S.answers = (S.answers || []).concat([{ p: S.part, q: S.qi, k, ok }]); render(); }
 function storyNextQ() { const S = STORY; S.qi++; S.picked = null;
@@ -1717,12 +1740,19 @@ function drawTour() {
   try { t.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) { t.scrollIntoView({ block: "center" }); }
   setTimeout(() => { const r = t.getBoundingClientRect(); const pad = 8; const ov = document.createElement("div"); ov.className = "tour";
     const below = r.top < innerHeight / 2;
+    const tappable = t.matches("button, [data-act], a"); const tapHint = tappable ? `<p class="small" style="color:var(--accent-ink);background:var(--accent);display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700">${KO() && UI() !== "en" ? "눌러서 직접 가 보기 →" : "Tap it to try →"}</p>` : "";
     ov.innerHTML = `<div class="tour-hole" style="left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px"></div>
       <div class="tour-card" style="${below ? `top:${Math.min(innerHeight - 220, r.bottom + 16)}px` : `bottom:${Math.min(innerHeight - 220, innerHeight - r.top + 16)}px`}">
-      <p class="eyebrow">${TI + 1} / ${TSTEPS.length}</p><p style="font-weight:800;font-size:17px">${esc(st.en)}</p>${KO() ? `<p class="muted">${esc(st.ko)}</p>` : ""}
+      <p class="eyebrow">${TI + 1} / ${TSTEPS.length}</p><p style="font-weight:800;font-size:17px">${esc(st.en)}</p>${KO() && UI() !== "en" ? `<p class="muted">${esc(st.ko)}</p>` : ""}${tapHint}
       <div class="row between"><button class="ghost" data-act="tourEnd">Skip</button><div class="row">${TI ? `<button data-act="tourBack">Back</button>` : ""}<button class="primary" data-act="tourNext">${TI + 1 < TSTEPS.length ? "Next" : "Got it!"}</button></div></div></div>`;
-    document.body.appendChild(ov); }, 320);
+    document.body.appendChild(ov);
+    if (tappable) { // the real thing is clickable through the spotlight: a tab moves the tour along, an activity ends the tour and hands over to that screen
+      t.addEventListener("click", () => { const isTab = t.matches("[data-tab]"); document.querySelectorAll(".tour").forEach(x => x.remove());
+        if (isTab && TI + 1 < TSTEPS.length && TKEY === "main") { TI++; setTimeout(drawTour, 450); } else tourEnd(); }, { once: true, capture: true }); } }, 320);
 }
+// while the tour is up, only the spotlighted thing and the tour card can be tapped
+document.addEventListener("click", ev => { if (TI < 0 || !document.querySelector(".tour")) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel);
+  if (ev.target.closest(".tour-card") || (t && t.contains(ev.target))) return; ev.preventDefault(); ev.stopImmediatePropagation(); }, true);
 // keep the spotlight on its target if the page moves under it (iOS address bar, late layout)
 ["scroll", "resize"].forEach(ev => window.addEventListener(ev, () => { if (TI < 0) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel); const h = document.querySelector(".tour-hole"); if (!t || !h) return; const r = t.getBoundingClientRect(); h.style.left = (r.left - 8) + "px"; h.style.top = (r.top - 8) + "px"; h.style.width = (r.width + 16) + "px"; h.style.height = (r.height + 16) + "px"; }, { passive: true }));
 function tourEnd() { TI = -1; document.querySelectorAll(".tour").forEach(x => x.remove());
@@ -1827,7 +1857,7 @@ const TEST_IDS = (window.__TEST__ || []).filter(id => BY[id] && typeof BY[id].g 
 const KO = () => !(ST && ST.settings && ST.settings.lang === "en");
 const gloss = e => KO() ? e.ko : e.def;
 const KR_TAG = { 1: "초등 필수", 2: "중·고 필수", 3: "고등 선택" };
-const krBadge = e => e && e.kr ? `<span class="pill sun" title="Korean national curriculum word">🇰🇷 ${KR_TAG[e.kr]}</span>` : "";
+const krBadge = e => e && e.kr ? `<span class="pill sun" title="Korean national curriculum word">🇰🇷 ${TL(KR_TAG[e.kr], ["", "Elementary core", "Middle & high core", "High school elective"][e.kr])}</span>` : "";
 const sgloss = s => KO() ? s.ko : s.def;
 function ageOf(st) { const p = st && st.profile; if (!p) return null; if (p.dob) { const d = new Date(p.dob + "T12:00:00"), n = new Date(); let a = n.getFullYear() - d.getFullYear(); if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a--; return a; } return p.age != null ? p.age : null; }
 const MAXG = 13; // scale K–12
@@ -1873,8 +1903,8 @@ function gradedPick(st, words, used, n) {
 
 /* ---------- onboarding ---------- */
 /* onboarding: one question per screen, Bubbo asks */
-let OB = 0, OB_INTRO = true, OB_DIR = 1; // OB_DIR: 1 forward, -1 back, 0 re-render in place
-const GOALS = [["school", "학교 영어 성적", "📝"], ["speak", "말하기 자신감", "🗣️"], ["read", "영어 책 읽기", "📚"], ["test", "시험 준비 (TOEFL, 수능…)", "🎯"], ["fun", "그냥 재미있게!", "🎈"]];
+let OB = 0, OB_INTRO = true, OB_DIR = 1, OB_UI = true; // OB_DIR: 1 forward, -1 back, 0 re-render in place · OB_UI: app-language screen comes first
+const GOALS = [["school", "학교 영어 성적", "📝", "Better school grades"], ["speak", "말하기 자신감", "🗣️", "Confident speaking"], ["read", "영어 책 읽기", "📚", "Reading English books"], ["test", "시험 준비 (TOEFL, 수능…)", "🎯", "Test prep (TOEFL, CSAT…)"], ["fun", "그냥 재미있게!", "🎈", "Just for fun!"]];
 function obAsk(mood, q, sub) { return `<div class="ob-ask"><div class="mslot" data-hold="1" data-sc=".82" data-key="q"></div><div class="bub" style="flex:1"><div class="ob-q">${q}</div>${sub ? `<div class="muted" style="margin-top:6px">${sub}</div>` : ""}</div></div>`; }
 /* shared shell for the question screens: back arrow + progress bar on top, one big button at the bottom */
 function obShell(opt) { const dir = OB_DIR; OB_DIR = 0;
@@ -1888,54 +1918,60 @@ function obSteps() { const p = ST.profile || {}; const dob = ST._dob || p.dob ||
 function obCanGo() { const st = obSteps()[OB]; const v = id => ((document.getElementById(id) || {}).value || "").trim();
   if (st === "name") return !!v("obName"); if (st === "dob") return !!(v("obY") && v("obM") && v("obD"));
   if (st === "consent") return !!(v("obParent") && (document.getElementById("obConsent") || {}).checked);
-  if (st === "lang") return !!(ST._lang || (ST.settings && ST.settings.lang)) || true; if (st === "goal") return (ST._goals || []).length > 0; return true; }
+  if (st === "lang") return !!ST._lang; if (st === "goal") return (ST._goals || []).length > 0; return true; }
 function obReady(typed) { const b = document.getElementById("obGo"); if (b) b.disabled = !obCanGo(); if (typed) mascotWrite(); }
 function renderOnboard() {
   const p = ST.profile || {}; const dob = ST._dob || p.dob || ""; const age = dob ? ageOf({ profile: { dob } }) : null;
   const name = ST._name != null ? ST._name : (p.name || ""); const lang = ST._lang || (ST.settings && ST.settings.lang) || "ko";
   const steps = obSteps(); OB = Math.max(0, Math.min(steps.length - 1, OB)); const st = steps[OB]; const last = OB === steps.length - 1;
+  if (OB_UI && OB_INTRO && OB === 0 && !p.name) { OB_DIR = 0; const u = ST.settings && ST.settings.ui; const card = (v, big, ex) => `<button type="button" class="goal" data-act="obUi" data-v="${v}" aria-pressed="${u === v}" style="min-height:84px"><span style="flex:1;text-align:left"><b style="font-size:22px">${big}</b><br><span class="muted small">${ex}</span></span><span class="ck"></span></button>`;
+    $app.innerHTML = `<div class="ob-wrap"><div class="ob-screen" style="animation:none"><div class="ob-hero"><div style="font-size:56px">🌏</div><div class="ob-q">${TL("어떤 말로 할까?", "Which language?")}</div>${UI() === "en" ? "" : `<p class="muted">Which language should the app use?</p>`}
+      <div class="goals" style="width:100%">${card("ko", "한국어", "안녕! 난 Bubbo야.")}${card("en", "English", "Hi! I'm Bubbo.")}</div><p class="muted small">${TL("나중에 Me에서 바꿀 수 있어.", "You can change it later in Me.")}</p></div></div>
+      <div class="ob-foot"><button class="big primary" data-act="obUiGo" ${u ? "" : "disabled"}>${TLK("next")}</button></div></div>`; return; }
   if (OB_INTRO && OB === 0 && !p.name) { OB_DIR = 0;
-    $app.innerHTML = `<div class="ob-wrap"><div class="ob-screen" style="animation:none"><div class="ob-hero"><div class="bub">안녕! 난 <b>Bubbo</b>야.<br>몇 가지만 물어보고 시작할게!</div><div class="mslot hero" data-sc="1.5" data-act="run" data-key="intro"></div><p class="muted">Hi, I'm Bubbo. A few quick questions and we're off.</p></div></div>
-      <div class="ob-foot"><button class="big primary" data-act="obIntroGo">계속 →</button><p class="muted small" style="text-align:center;margin-top:10px">계속하면 <a href="#" data-act="privacy">개인정보 안내</a>에 동의하는 거예요.</p></div></div>`; return; }
+    $app.innerHTML = `<div class="ob-wrap"><div class="ob-screen" style="animation:none"><div class="ob-hero"><div class="bub">${TL("안녕! 난 <b>Bubbo</b>야.<br>몇 가지만 물어보고 시작할게!", "Hi! I'm <b>Bubbo</b>.<br>A few quick questions and we're off.")}</div><div class="mslot hero" data-sc="1.5" data-act="run" data-key="intro"></div>${UI() === "en" ? "" : `<p class="muted">Hi, I'm Bubbo. A few quick questions and we're off.</p>`}</div></div>
+      <div class="ob-foot"><button class="big primary" data-act="obIntroGo">${TLK("next")}</button><p class="muted small" style="text-align:center;margin-top:10px">${TL(`계속하면 <a href="#" data-act="privacy">개인정보 안내</a>에 동의하는 거예요.`, `By continuing, you agree to the <a href="#" data-act="privacy">privacy note</a>.`)}</p></div></div>`; return; }
   let body = "";
-  if (st === "name") body = obAsk("happy", "네 이름은 뭐야?", "What's your name?") + `<input id="obName" type="text" autocomplete="given-name" value="${esc(name)}" placeholder="이름 · Your name" maxlength="30" autofocus data-input="obReady">`;
-  else if (st === "dob") body = obAsk("happy", `반가워, ${esc(name.trim() || "친구")}!<br>생일은 언제야?`, "When's your birthday? 단어 레벨을 맞추는 데 써요.") + dobSelects(dob) + `<input id="obDob" type="hidden" value="${esc(dob)}">${age != null ? `<p class="muted small">만 ${age}세</p>` : ""}`;
-  else if (st === "consent") body = obAsk("think", "부모님께 한 가지만<br>여쭤볼게요.", `${esc(name.trim())}는 만 14세 미만이라 보호자 동의가 필요해요.`) + `<div class="card"><div class="field"><label for="obParent">보호자 이름 · Parent or guardian</label><input id="obParent" type="text" value="${esc(ST._parent || "")}" maxlength="40" data-input="obReady"></div>
-      <label class="row" style="gap:10px;align-items:flex-start;font-weight:700"><input id="obConsent" type="checkbox" ${ST._consent ? "checked" : ""} style="width:22px;height:22px;flex:none;margin-top:2px" data-change="obReady"><span>저는 보호자이며 <a href="#" data-act="privacy">개인정보 안내</a>에 동의합니다. I'm the parent/guardian and I agree to the privacy note.</span></label></div>`;
-  else if (st === "lang") body = obAsk("happy", "단어 뜻은 어떻게<br>보여 줄까?", "How should I show meanings?") + `<div class="goals"><button type="button" class="goal" data-act="obLang" data-v="ko" aria-pressed="${lang !== "en"}"><span style="font-size:22px">🇰🇷</span>영어 + 한국어 뜻<span class="ck"></span></button><button type="button" class="goal" data-act="obLang" data-v="en" aria-pressed="${lang === "en"}"><span style="font-size:22px">🇺🇸</span>English only<span class="ck"></span></button></div>`;
-  else if (st === "theme") body = obAsk("cheer", "네 Vocaboo 색을<br>골라 봐!", "Pick your colors. 언제든 바꿀 수 있어.") + themePicker();
-  else if (st === "goal") body = obAsk("wow", "영어, 왜 배우고 싶어?", "What's your goal? 여러 개 골라도 돼요.") + `<div class="goals">${GOALS.map(([k, l, ic]) => `<button type="button" class="goal" data-act="obGoal" data-v="${k}" aria-pressed="${(ST._goals || []).includes(k)}"><span style="font-size:22px">${ic}</span>${l}<span class="ck"></span></button>`).join("")}</div>`;
-  $app.innerHTML = obShell({ form: "onboard", back: "obBack", pct: (OB + 1) / (steps.length + 1) * 100, body, btn: last ? "시작! 🚀" : "계속 →", disabled: true });
+  if (st === "name") body = obAsk("happy", TL("네 이름은 뭐야?", "What's your name?"), UI() === "en" ? "" : "What's your name?") + `<input id="obName" type="text" autocomplete="given-name" value="${esc(name)}" placeholder="${TL("이름 · Your name", "Your name")}" maxlength="30" autofocus data-input="obReady">`;
+  else if (st === "dob") body = obAsk("happy", TL(`반가워, ${esc(name.trim() || "친구")}!<br>생일은 언제야?`, `Nice to meet you, ${esc(name.trim() || "friend")}!<br>When's your birthday?`), TL("When's your birthday? 단어 레벨을 맞추는 데 써요.", "It helps me pick words at your level.")) + dobSelects(dob) + `<input id="obDob" type="hidden" value="${esc(dob)}">${age != null ? `<p class="muted small">${TL(`만 ${age}세`, `Age ${age}`)}</p>` : ""}`;
+  else if (st === "consent") body = obAsk("think", TL("부모님께 한 가지만<br>여쭤볼게요.", "One question<br>for a parent."), TL(`${esc(name.trim())}는 만 14세 미만이라 보호자 동의가 필요해요.`, `${esc(name.trim())} is under 14, so a parent or guardian needs to agree.`)) + `<div class="card"><div class="field"><label for="obParent">${TL("보호자 이름 · Parent or guardian", "Parent or guardian's name")}</label><input id="obParent" type="text" value="${esc(ST._parent || "")}" maxlength="40" data-input="obReady"></div>
+      <label class="row" style="gap:10px;align-items:flex-start;font-weight:700"><input id="obConsent" type="checkbox" ${ST._consent ? "checked" : ""} style="width:22px;height:22px;flex:none;margin-top:2px" data-change="obReady"><span>${TL(`저는 보호자이며 <a href="#" data-act="privacy">개인정보 안내</a>에 동의합니다. I'm the parent/guardian and I agree to the privacy note.`, `I'm the parent/guardian and I agree to the <a href="#" data-act="privacy">privacy note</a>.`)}</span></label></div>`;
+  else if (st === "lang") body = obAsk("happy", TL("단어 뜻은 어떻게<br>보여 줄까?", "How should I show<br>word meanings?"), TL("How should I show meanings? 하나를 골라 줘.", "Pick one.")) + `<div class="goals">
+      <button type="button" class="goal" data-act="obLang" data-v="ko" aria-pressed="${ST._lang === "ko"}" style="min-height:74px"><span style="flex:1;text-align:left"><b>${TL("영어 + 한국어 뜻", "English + Korean meanings")}</b><br><span class="muted small">sharp → 날카로운 · a knife that cuts easily</span></span><span class="ck"></span></button>
+      <button type="button" class="goal" data-act="obLang" data-v="en" aria-pressed="${ST._lang === "en"}" style="min-height:74px"><span style="flex:1;text-align:left"><b>English only</b><br><span class="muted small">sharp → a knife that cuts easily</span></span><span class="ck"></span></button></div>`;
+  else if (st === "theme") body = obAsk("cheer", TL("네 Vocaboo 색을<br>골라 봐!", "Pick your<br>Vocaboo colors!"), TL("Pick your colors. 언제든 바꿀 수 있어.", "You can change them any time.")) + themePicker();
+  else if (st === "goal") body = obAsk("wow", TL("영어, 왜 배우고 싶어?", "Why do you want to learn English?"), TL("What's your goal? 여러 개 골라도 돼요.", "Pick as many as you like.")) + `<div class="goals">${GOALS.map(([k, l, ic, en]) => `<button type="button" class="goal" data-act="obGoal" data-v="${k}" aria-pressed="${(ST._goals || []).includes(k)}"><span style="font-size:22px">${ic}</span>${TL(l, en)}<span class="ck"></span></button>`).join("")}</div>`;
+  $app.innerHTML = obShell({ form: "onboard", back: "obBack", pct: (OB + 1) / (steps.length + 1) * 100, body, btn: last ? TL("시작! 🚀", "Let's go! 🚀") : TLK("next"), disabled: true });
   obReady(); const inp = document.getElementById("obName"); if (inp) inp.focus();
 }
 /* "it's really you!" welcome back, once a day */
 const HELLO_LINES = { // welcome back, with personality: [headline, sub]
-  morning: [["좋은 아침, {n}!", "단어 몇 개로 하루를 열어 볼까?"], ["{n}, 일어났구나 ☀️", "아침 머리가 제일 잘 외워져. 지금이 기회!"], ["오늘도 왔네, {n}!", "학교 가기 전에 딱 5분만."]],
-  day: [["{n}, 정말 너구나!", "돌아와서 반가워. 오늘 단어 보러 갈까?"], ["왔구나 왔어, {n} 👀", "Bubbo가 공책 펴 놓고 기다렸어."], ["오늘의 {n} 등장!", "어제보다 딱 한 개만 더 외우자."], ["{n}! 기다렸잖아", "오늘 단어, 10분이면 끝나."]],
-  night: [["{n}, 자기 전에 왔네 🌙", "자기 전에 본 단어는 꿈에서도 복습돼."], ["늦었지만 잘 왔어, {n}", "오늘 단어 몇 개만 보고 푹 자자."]],
-  streak: [["{s}일째야, {n} 🔥", "이제 못 멈춰. 오늘도 이어 가자."], ["{n}, {s}일 연속!", "이 불 꺼지면 Bubbo가 울어…"], ["{s}일 연속 출석, 대단해!", "오늘 단어만 끝내면 {s1}일째."]],
-  big: [["{s}일 연속이라니, {n}!", "이건 진짜 습관이 된 거야."], ["{n}는 멈추지 않는다 🔥 {s}일", "오늘도 보러 왔구나. 멋져."]] };
-function renderHello() { const nm = firstName() || "친구"; const s = streakNow(); const h = new Date().getHours();
-  const pool = s >= 14 ? HELLO_LINES.big : s >= 3 ? HELLO_LINES.streak : h < 11 ? HELLO_LINES.morning : h >= 21 ? HELLO_LINES.night : HELLO_LINES.day;
+  morning: { ko: [["좋은 아침, {n}!", "단어 몇 개로 하루를 열어 볼까?"], ["{n}, 일어났구나 ☀️", "아침 머리가 제일 잘 외워져. 지금이 기회!"], ["오늘도 왔네, {n}!", "학교 가기 전에 딱 5분만."]], en: [["Good morning, {n}!", "Shall we start the day with a few words?"], ["{n}, you're up ☀️", "Morning brains remember best. Now's your chance."], ["Here again today, {n}!", "Just 5 minutes before school."]] },
+  day: { ko: [["{n}, 정말 너구나!", "돌아와서 반가워. 오늘 단어 보러 갈까?"], ["왔구나 왔어, {n} 👀", "Bubbo가 공책 펴 놓고 기다렸어."], ["오늘의 {n} 등장!", "어제보다 딱 한 개만 더 외우자."], ["{n}! 기다렸잖아", "오늘 단어, 10분이면 끝나."]], en: [["{n}, it's really you!", "Good to have you back. Shall we see today's words?"], ["There you are, {n} 👀", "Bubbo had the notebook open, waiting."], ["Here comes {n}!", "Just one more word than yesterday."], ["{n}! I was waiting", "Today's words take about 10 minutes."]] },
+  night: { ko: [["{n}, 자기 전에 왔네 🌙", "자기 전에 본 단어는 꿈에서도 복습돼."], ["늦었지만 잘 왔어, {n}", "오늘 단어 몇 개만 보고 푹 자자."]], en: [["{n}, here before bed 🌙", "Words you see before sleep get reviewed in your dreams."], ["Late, but glad you came, {n}", "A few words, then a good sleep."]] },
+  streak: { ko: [["{s}일째야, {n} 🔥", "이제 못 멈춰. 오늘도 이어 가자."], ["{n}, {s}일 연속!", "이 불 꺼지면 Bubbo가 울어…"], ["{s}일 연속 출석, 대단해!", "오늘 단어만 끝내면 {s1}일째."]], en: [["Day {s}, {n} 🔥", "No stopping now. Let's keep it going."], ["{n}, {s} days in a row!", "If this fire goes out, Bubbo will cry…"], ["{s} days in a row. Amazing!", "Finish today's words for day {s1}."]] },
+  big: { ko: [["{s}일 연속이라니, {n}!", "이건 진짜 습관이 된 거야."], ["{n}는 멈추지 않는다 🔥 {s}일", "오늘도 보러 왔구나. 멋져."]], en: [["{s} days in a row, {n}!", "This is a real habit now."], ["{n} doesn't stop 🔥 {s} days", "Here again today. Nice."]] } };
+function renderHello() { const nm = firstName() || TL("친구", "friend"); const s = streakNow(); const h = new Date().getHours();
+  const pg = s >= 14 ? HELLO_LINES.big : s >= 3 ? HELLO_LINES.streak : h < 11 ? HELLO_LINES.morning : h >= 21 ? HELLO_LINES.night : HELLO_LINES.day; const pool = TL(pg.ko, pg.en);
   const [a, b] = pool[Math.floor(Math.random() * pool.length)].map(x => esc(x.replace(/\{n\}/g, nm).replace(/\{s1\}/g, s + 1).replace(/\{s\}/g, s)));
   $app.innerHTML = `<div class="hello${document.getElementById("splash") ? " wait" : ""}"><span class="hl-eyebrow">GOOD TO SEE YOU</span><h1>${a}</h1><div class="mslot hero" data-sc="1.4" data-act="wave" data-fill="auto" data-key="hello"></div>
-    ${s >= 2 ? `<span class="streak-big">🔥 ${s}</span>` : ""}<p class="hl-line">${b}</p><button class="big primary hl-btn" data-act="helloGo">좋아, 시작! →</button></div>`; }
+    ${s >= 2 ? `<span class="streak-big">🔥 ${s}</span>` : ""}<p class="hl-line">${b}</p><button class="big primary hl-btn" data-act="helloGo">${TL("좋아, 시작! →", "Let's go! →")}</button></div>`; }
 function obNext() {
   stashOnboard(); const p = ST.profile || {}; const dob = ST._dob || p.dob || ""; const age = dob ? ageOf({ profile: { dob } }) : null; const kid = age != null && age < 14;
   const steps = ["name", "dob"].concat(kid ? ["consent"] : []).concat(["lang", "theme", "goal"]); const st = steps[OB];
-  if (st === "name" && !(ST._name || "").trim()) { toast("이름을 알려 줘!"); return; }
-  if (st === "dob") { if (!dob) { toast("생일을 골라 줘!"); return; } if (age == null || age < 3 || age > 100) { toast("생일을 다시 확인해 줘"); return; } }
-  if (st === "consent" && (!ST._consent || !(ST._parent || "").trim())) { toast("보호자 이름과 동의가 필요해요"); return; }
+  if (st === "name" && !(ST._name || "").trim()) { toast(TL("이름을 알려 줘!", "Tell me your name!")); return; }
+  if (st === "dob") { if (!dob) { toast(TL("생일을 골라 줘!", "Pick your birthday!")); return; } if (age == null || age < 3 || age > 100) { toast(TL("생일을 다시 확인해 줘", "Check your birthday again")); return; } }
+  if (st === "consent" && (!ST._consent || !(ST._parent || "").trim())) { toast(TL("보호자 이름과 동의가 필요해요", "A parent's name and agreement are needed")); return; }
   if (OB >= steps.length - 1) return saveOnboard();
   OB++; OB_DIR = 1; render(); mascotNext();
 }
-function privacyHtml() { return `<div class="cel" id="privacy"><div class="cel-card" style="text-align:left;max-height:80vh;overflow:auto"><h2>Privacy note · 개인정보 안내</h2>
+function privacyHtml() { return `<div class="cel" id="privacy"><div class="cel-card" style="text-align:left;max-height:80vh;overflow:auto"><h2>${TL("Privacy note · 개인정보 안내", "Privacy note")}</h2>
   <p class="small"><b>What we keep:</b> name, date of birth, email login, and learning records (answers, quiz scores, study time, sentences written or said in the app, feedback you send).</p>
   <p class="small"><b>Who sees it:</b> only the student and their Vocaboo teacher. It is never sold or shown to other users.</p>
   <p class="small"><b>Voice:</b> speaking practice uses your phone's built-in speech recognition. Vocaboo saves only the words it heard, not recordings.</p>
   <p class="small"><b>AI feedback:</b> sentences and stories are sent to Google's Gemini AI to create feedback.</p>
   <p class="small"><b>Delete:</b> you can erase everything any time in ⚙️ → My settings → Reset my account, or ask your teacher.</p>
-  <p class="small muted">이름, 생년월일, 이메일, 학습 기록만 저장하며 학생과 담당 선생님만 볼 수 있어요. 문장 피드백을 위해 Google Gemini AI를 사용해요. 설정에서 언제든지 모든 기록을 삭제할 수 있어요.</p>
+  ${UI() === "en" ? "" : `<p class="small muted">이름, 생년월일, 이메일, 학습 기록만 저장하며 학생과 담당 선생님만 볼 수 있어요. 문장 피드백을 위해 Google Gemini AI를 사용해요. 설정에서 언제든지 모든 기록을 삭제할 수 있어요.</p>`}
   <button class="big primary" data-act="privacyClose">OK</button></div></div>`; }
 /* birthday: three simple dropdowns (one tap each) instead of the phone's date wheel */
 function dobSelects(dob) {
@@ -1943,11 +1979,11 @@ function dobSelects(dob) {
   const days = y && m ? new Date(y, m, 0).getDate() : 31; const st = 'style="min-height:52px;font:inherit;font-size:17px;border-radius:14px;border:2px solid var(--line);padding:0 8px;background:#fff;width:100%"';
   const opt = (v, cur, lab) => `<option value="${v}" ${+cur === v ? "selected" : ""}>${lab}</option>`;
   const ys = []; for (let k = ny - 2; k >= 1930; k--) ys.push(opt(k, y, k));
-  const ms = []; for (let k = 1; k <= 12; k++) ms.push(opt(k, m, ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][k - 1] + " · " + k + "월"));
+  const ms = []; for (let k = 1; k <= 12; k++) ms.push(opt(k, m, ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][k - 1] + TL(" · " + k + "월", "")));
   const ds = []; for (let k = 1; k <= days; k++) ds.push(opt(k, d, k));
-  return `<div style="display:grid;grid-template-columns:1.1fr 1.3fr .9fr;gap:8px"><select id="obY" data-change="obDobSel" ${st} aria-label="Year"><option value="">Year · 년</option>${ys.join("")}</select>
-    <select id="obM" data-change="obDobSel" ${st} aria-label="Month"><option value="">Month · 월</option>${ms.join("")}</select>
-    <select id="obD" data-change="obDobSel" ${st} aria-label="Day"><option value="">Day · 일</option>${ds.join("")}</select></div>`;
+  return `<div style="display:grid;grid-template-columns:1.1fr 1.3fr .9fr;gap:8px"><select id="obY" data-change="obDobSel" ${st} aria-label="Year"><option value="">${TL("Year · 년", "Year")}</option>${ys.join("")}</select>
+    <select id="obM" data-change="obDobSel" ${st} aria-label="Month"><option value="">${TL("Month · 월", "Month")}</option>${ms.join("")}</select>
+    <select id="obD" data-change="obDobSel" ${st} aria-label="Day"><option value="">${TL("Day · 일", "Day")}</option>${ds.join("")}</select></div>`;
 }
 function stashOnboard() { const v = id => (document.getElementById(id) || {}).value; if (document.getElementById("obName")) ST._name = v("obName"); const c = document.getElementById("obConsent"); if (c) ST._consent = c.checked; const pa = document.getElementById("obParent"); if (pa) ST._parent = pa.value; }
 function saveOnboard() {
@@ -1959,7 +1995,7 @@ function saveOnboard() {
   ST.profile = { name: name.slice(0, 30), dob, at: Date.now() };
   if (age < 14) ST.consent = { by: ST._parent.trim().slice(0, 40), at: Date.now(), v: 1 }; else ST.consent = { self: true, at: Date.now(), v: 1 };
   ST.settings = Object.assign({}, ST.settings || {}, { lang: ST._lang || (ST.settings && ST.settings.lang) || "ko" }); ST.goals = ST._goals || [];
-  ["_lang", "_dob", "_dobP", "_name", "_consent", "_parent", "_goals"].forEach(k => delete ST[k]); OB = 0; OB_INTRO = true; OB_DIR = 1;
+  ["_lang", "_dob", "_dobP", "_name", "_consent", "_parent", "_goals"].forEach(k => delete ST[k]); OB = 0; OB_INTRO = true; OB_DIR = 1; OB_UI = true;
   saveST(); logDid("profile"); view = { name: studentHome() }; render();
 }
 
@@ -1981,7 +2017,7 @@ function renderLevelIntro() {
     { icon: "🚀", t: "Ready?", b: "About 25–30 words. Take your time.", k: "준비됐나요?" }];
   LIS = Math.max(0, Math.min(steps.length - 1, LIS)); const st = steps[LIS]; const last = LIS === steps.length - 1;
   $app.innerHTML = `${previewBar()}<div class="intro-wrap"><div class="card intro-card" style="align-items:center;text-align:center">
-    <div class="intro-ic">${st.icon}</div><h1 style="font-size:28px">${st.t}</h1><p style="font-size:19px">${st.b}</p>${ko ? `<p class="muted">${st.k}</p>` : ""}
+    <div class="intro-ic">${st.icon}</div><h1 style="font-size:28px">${st.t}</h1><p style="font-size:19px">${st.b}</p>${ko && UI() !== "en" ? `<p class="muted">${st.k}</p>` : ""}
     <div class="intro-dots">${steps.map((_, i) => `<i class="${i === LIS ? "on" : i < LIS ? "done" : ""}"></i>`).join("")}</div>
     <div style="display:grid;grid-template-columns:${LIS ? "1fr 1.6fr" : "1fr"};gap:10px;width:100%">${LIS ? `<button class="big" data-act="liBack">← Back</button>` : ""}
       ${last ? `<button class="big primary" data-act="startLevel">Start! 🎯</button>` : `<button class="big primary" data-act="liNext">Next →</button>`}</div>
@@ -2125,12 +2161,12 @@ function openMenu() {
 }
 function closeMenu() { const m = document.getElementById("menuWrap"); if (m) m.remove(); }
 /* "wait, don't go" popup: sad Bubbo with a different line each time */
-const QUIT_LINES = [["잠깐… 벌써 가게?", "조금만 더 하면 오늘 목표 끝이야."], ["지금 나가면 Bubbo 혼자 남아…", "딱 한 문제만 더 해 볼래?"], ["여기까지 온 게 아까워!", "거의 다 왔어. 같이 마무리하자."], ["오늘 스트릭 🔥 지켜야지!", "1분이면 돼. 진짜로."], ["단어들이 널 기다리고 있어 👀", "하나만 더 하고 가자."], ["포기는 내일 해도 돼.", "오늘은 한 개만 더!"], ["쉬는 것도 좋아. 근데…", "지금 딱 좋은 흐름이었단 말이야."], ["Bubbo가 공책 꺼내 놨는데…", "한 페이지만 더 채우고 가자."]];
+const QUIT_LINES = [["잠깐… 벌써 가게?", "조금만 더 하면 오늘 목표 끝이야.", "Wait… leaving already?", "A little more and today's goal is done."], ["지금 나가면 Bubbo 혼자 남아…", "딱 한 문제만 더 해 볼래?", "If you go now, Bubbo is all alone…", "Just one more?"], ["여기까지 온 게 아까워!", "거의 다 왔어. 같이 마무리하자.", "You've come so far!", "Almost there. Let's finish together."], ["오늘 스트릭 🔥 지켜야지!", "1분이면 돼. 진짜로.", "Keep your streak 🔥 alive!", "It takes one minute. Really."], ["단어들이 널 기다리고 있어 👀", "하나만 더 하고 가자.", "Your words are waiting for you 👀", "One more, then go."], ["포기는 내일 해도 돼.", "오늘은 한 개만 더!", "You can give up tomorrow.", "Today, just one more."], ["쉬는 것도 좋아. 근데…", "지금 딱 좋은 흐름이었단 말이야.", "Breaks are good. But…", "You were on such a roll."], ["Bubbo가 공책 꺼내 놨는데…", "한 페이지만 더 채우고 가자.", "Bubbo got the notebook out…", "Let's fill one more page."]];
 let QUIT_I = Math.floor(Math.random() * QUIT_LINES.length);
-function quitSheet(act) { const [a, b] = QUIT_LINES[QUIT_I++ % QUIT_LINES.length]; const prog = TR ? Object.keys(TR.seen || {}).length : RUN ? RUN.i : CO ? CO.i : 0;
+function quitSheet(act) { const ql = QUIT_LINES[QUIT_I++ % QUIT_LINES.length]; const [a, b] = UI() === "en" ? ql.slice(2) : ql; const prog = TR ? Object.keys(TR.seen || {}).length : RUN ? RUN.i : CO ? CO.i : 0;
   const el = document.createElement("div"); el.className = "cel"; el.id = "quitSheet"; el.setAttribute("role", "dialog");
-  el.innerHTML = `<div class="cel-card" style="gap:10px"><div style="display:flex;justify-content:center">${bubbo("sad", 120)}</div><h2 style="margin:0;font-family:var(--f-ko)">${a}</h2><p class="muted" style="margin:0">${b}${prog ? ` 지금까지 ${prog}개 했어.` : ""}</p>
-    <button class="big primary" data-act="quitStay">계속할게 💪</button><button class="big" data-act="${act}" data-sure="1">${act === "saveExit" ? "저장하고 나가기" : "그래도 나갈래"}</button></div>`;
+  el.innerHTML = `<div class="cel-card" style="gap:10px"><div style="display:flex;justify-content:center">${bubbo("sad", 120)}</div><h2 style="margin:0;font-family:var(--f-ko)">${a}</h2><p class="muted" style="margin:0">${b}${prog ? TL(` 지금까지 ${prog}개 했어.`, ` You've done ${prog} so far.`) : ""}</p>
+    <button class="big primary" data-act="quitStay">${TL("계속할게 💪", "I'll keep going 💪")}</button><button class="big" data-act="${act}" data-sure="1">${act === "saveExit" ? TL("저장하고 나가기", "Save and exit") : TL("그래도 나갈래", "Leave anyway")}</button></div>`;
   el.addEventListener("click", e => { if (e.target === el) el.remove(); }); document.body.appendChild(el); try { haptic("bad"); } catch (e) {} }
 function closeQuit() { const el = document.getElementById("quitSheet"); if (el) el.remove(); }
 function leaveActivity() { closeQuit(); stopAudio(); if (typeof flushXP === "function") flushXP(); if (ATT && !ATT.end && view.name !== "story") { ATT.quit = Date.now(); saveAttempt(); } RUN = null; TR = null; CO = null; STORY = null; LT = null; }
@@ -2145,7 +2181,7 @@ function maybeAskPush() {
   if (ST.pushAskDay && (Date.now() - new Date(ST.pushAskDay + "T12:00:00").getTime()) < 4 * 864e5) return false; // not every day: every 4 days at most
   ST.pushAskDay = today(); saveST(); PUSHASK = true;
   const el = document.createElement("div"); el.className = "cel"; el.id = "pushAsk";
-  el.innerHTML = `<div class="cel-card"><div class="cel-icon">🔔</div><h2>Turn on reminders?</h2><p class="muted">Vocaboo can send a friendly reminder at 8am, 5pm and 8pm so you never lose your streak.</p>${KO() ? `<p class="muted small">알림을 켜면 연속 기록을 지키기 쉬워요!</p>` : ""}<button class="big primary" data-act="pushAskYes">Yes, remind me</button><button class="big" data-act="pushAskNo">Not now</button></div>`;
+  el.innerHTML = `<div class="cel-card"><div class="cel-icon">🔔</div><h2>Turn on reminders?</h2><p class="muted">Vocaboo can send a friendly reminder at 8am, 5pm and 8pm so you never lose your streak.</p>${KO() && UI() !== "en" ? `<p class="muted small">알림을 켜면 연속 기록을 지키기 쉬워요!</p>` : ""}<button class="big primary" data-act="pushAskYes">Yes, remind me</button><button class="big" data-act="pushAskNo">Not now</button></div>`;
   document.body.appendChild(el); return true;
 }
 function closePushAsk() { const el = document.getElementById("pushAsk"); if (el) el.remove(); PUSHASK = false; if (ST && !ST.tourDone && TI < 0) setTimeout(startTour, 300); }
@@ -2154,7 +2190,7 @@ function closePushAsk() { const el = document.getElementById("pushAsk"); if (el)
 function renderPending(rejected) {
   const em = (WW.user() && WW.user().email) || "";
   $app.innerHTML = `<section class="hero" style="text-align:center"><div class="stack" style="align-items:center;gap:10px">${buddy(rejected ? "sad" : "happy", 104)}<h1>${rejected ? "Account not approved" : ST.waitlist ? "You're on the list!" : "Almost there!"}</h1><p class="muted">${esc(em)}</p></div></section>
-  <div class="card">${!rejected && ST.waitlist ? `<h3>Sorry, all free beta spots are filled! 🙏</h3><p>Good news: you're on the <b>official launch list</b>. We'll let you know as soon as Vocaboo opens for more students.</p><p class="muted small">무료 베타 자리가 모두 찼어요. 정식 출시 명단에 등록되었으니 오픈하면 바로 알려 드릴게요!</p><button class="big primary" data-act="checkApproved">Check again</button>` : rejected ? `<p>Your teacher didn't approve this account. If you think this is a mistake, please contact your teacher.</p>` : `<h3>Waiting for your teacher</h3><p>Thanks, ${esc(firstName())}! Your teacher needs to approve your account before you can start. This is usually quick.</p><p class="muted small">선생님이 계정을 승인하면 바로 시작할 수 있어요.</p><button class="big primary" data-act="checkApproved">Check again</button>`}
+  <div class="card">${!rejected && ST.waitlist ? `<h3>Sorry, all free beta spots are filled! 🙏</h3><p>Good news: you're on the <b>official launch list</b>. We'll let you know as soon as Vocaboo opens for more students.</p>${UI() === "en" ? "" : `<p class="muted small">무료 베타 자리가 모두 찼어요. 정식 출시 명단에 등록되었으니 오픈하면 바로 알려 드릴게요!</p>`}<button class="big primary" data-act="checkApproved">Check again</button>` : rejected ? `<p>Your teacher didn't approve this account. If you think this is a mistake, please contact your teacher.</p>` : `<h3>Waiting for your teacher</h3><p>Thanks, ${esc(firstName())}! Your teacher needs to approve your account before you can start. This is usually quick.</p>${UI() === "en" ? "" : `<p class="muted small">선생님이 계정을 승인하면 바로 시작할 수 있어요.</p>`}<button class="big primary" data-act="checkApproved">Check again</button>`}
   <button class="big" data-act="signout">Sign out</button></div>`;
 }
 async function checkApproved() { const d = await db.doc(sPath()).get(); if (d.exists) { const x = d.data(); ST.approved = x.approved; ST.rejected = x.rejected; }
@@ -2168,7 +2204,7 @@ function resetAsk(step) {
   const el = document.createElement("div"); el.className = "cel"; el.id = "resetAsk";
   el.innerHTML = step === 1 ? `<div class="cel-card" style="text-align:left"><div class="cel-icon" style="text-align:center">⚠️</div><h2>Are you sure?</h2>
     <p>Resetting <b>permanently deletes</b>:</p><ul class="small" style="margin:0;padding-left:20px;line-height:1.7"><li>all your learned words and review history</li><li>your streak, XP, level and badges</li><li>quiz scores, stories, sentences and study time</li><li>your word level test results</li></ul>
-    <p class="small"><b>This cannot be undone.</b> Your login (email and password) stays the same.</p><p class="small muted">모든 학습 기록이 영구적으로 삭제되며 되돌릴 수 없어요.</p>
+    <p class="small"><b>This cannot be undone.</b> Your login (email and password) stays the same.</p>${UI() === "en" ? "" : `<p class="small muted">모든 학습 기록이 영구적으로 삭제되며 되돌릴 수 없어요.</p>`}
     <button class="big" data-act="resetStep2" style="color:#B3261E">Yes, continue</button><button class="big primary" data-act="resetCancel">Cancel</button></div>`
   : `<div class="cel-card" style="text-align:left"><h2>Last step</h2><p>Type <b>RESET</b> to permanently delete everything and start over.</p>
     <input id="resetTxt" type="text" autocomplete="off" autocapitalize="characters" style="min-height:52px;font:inherit;font-size:20px;border-radius:16px;border:2px solid var(--line);padding:0 14px;width:100%;text-transform:uppercase">
@@ -2195,7 +2231,7 @@ function feedbackAsk() {
   const el = document.createElement("div"); el.className = "cel"; el.id = "fbAsk";
   el.innerHTML = `<div class="cel-card" style="text-align:left"><h2>Send feedback 💬</h2><p class="muted small">What do you like? What's hard or broken? Ideas? 🔒 It's anonymous: your name isn't attached.</p>
     <div class="row" style="justify-content:space-between">${["😍", "🙂", "😐", "🙁"].map((f, k) => `<button class="opt rate" data-act="fbRate" data-r="${k}" style="flex:1;text-align:center;font-size:30px;min-height:58px">${f}</button>`).join("")}</div>
-    <textarea id="fbTxt" rows="4" maxlength="1500" placeholder="Type here… (한국어도 괜찮아요)" style="font:inherit;font-size:17px;padding:12px 14px;border-radius:18px;border:2px solid var(--line);width:100%;resize:vertical"></textarea>
+    <textarea id="fbTxt" rows="4" maxlength="1500" placeholder="${TL("Type here… (한국어도 괜찮아요)", "Type here…")}" style="font:inherit;font-size:17px;padding:12px 14px;border-radius:18px;border:2px solid var(--line);width:100%;resize:vertical"></textarea>
     <button class="big primary" data-act="fbSend">Send</button><button class="big" data-act="fbClose">Cancel</button></div>`;
   document.body.appendChild(el);
 }
@@ -2212,11 +2248,11 @@ function planCard() { const s = SET(); const c = effCfg(ST);
   if (s.textbook) return `<div class="card"><h3>My study plan</h3><p class="muted small">Your teacher sets your plan: ${c.newPerWeek} new words and ${c.reviewPerWeek} review words a week. ${packPlanText(c.newPerWeek)}</p></div>`;
   const sel = (id, vals, cur, unit) => `<select id="${id}" data-change="myPlan" style="min-height:48px;border-radius:14px;border:2px solid var(--line);padding:0 12px;font:inherit;font-size:17px;background:#fff">${vals.map(v => `<option value="${v}" ${+cur === v ? "selected" : ""}>${v} ${unit}</option>`).join("")}</select>`;
   const kor = s.kor != null ? s.kor : s.lang !== "en";
-  return `<div class="card"><h3>My study plan</h3><p class="muted small">Choose what fits your week. Changes start with next week's words. 매주 학습량을 직접 정할 수 있어요.</p>
+  return `<div class="card"><h3>My study plan</h3><p class="muted small">Choose what fits your week. Changes start with next week's words.${TL(" 매주 학습량을 직접 정할 수 있어요.", "")}</p>
     <div class="grid2"><div class="field"><label for="myNew">New words per week</label>${sel("myNew", [10, 15, 20, 25, 30, 40], s.grNew, "words")}</div>
     <div class="field"><label for="myRev">Review words per week</label>${sel("myRev", [0, 5, 10, 15, 20], s.review, "words")}</div>
     <div class="field"><label for="myQuiz">Daily quiz length</label>${sel("myQuiz", [10, 15, 20, 25, 30], ST.quizSize || 15, "questions")}</div>
-    ${KO() ? `<div class="field"><label for="myKor">Korean school words first</label><select id="myKor" data-change="myPlan" style="min-height:48px;border-radius:14px;border:2px solid var(--line);padding:0 12px;font:inherit;font-size:17px;background:#fff"><option value="1" ${kor ? "selected" : ""}>On (교과서 필수 단어 먼저)</option><option value="0" ${kor ? "" : "selected"}>Off</option></select></div>` : ""}</div>
+    ${KO() ? `<div class="field"><label for="myKor">Korean school words first</label><select id="myKor" data-change="myPlan" style="min-height:48px;border-radius:14px;border:2px solid var(--line);padding:0 12px;font:inherit;font-size:17px;background:#fff"><option value="1" ${kor ? "selected" : ""}>${TL("On (교과서 필수 단어 먼저)", "On")}</option><option value="0" ${kor ? "" : "selected"}>Off</option></select></div>` : ""}</div>
     <p class="muted small">📅 ${packPlanText((s.textbook ? s.tbNew : 0) + s.grNew)} About ${Math.round(Math.ceil(((s.textbook ? s.tbNew : 0) + s.grNew) / 5) * 1.5 + (ST.quizSize || 15) * 0.5 + 3)} minutes a day.</p></div>`; }
 function savePlan() { const v = id => document.getElementById(id); const s = Object.assign({}, ST.settings || {});
   if (v("myNew")) s.grNew = +v("myNew").value; if (v("myRev")) s.review = +v("myRev").value; if (v("myKor")) s.kor = v("myKor").value === "1";
@@ -2247,26 +2283,26 @@ function drawSurvey() {
   const el = document.createElement("div"); el.className = "cel"; el.id = "survey";
   const opt = (q, v, label) => { const on = q.type === "multi" ? (SV.a[q.k] || []).includes(v) : SV.a[q.k] === v;
     return `<button class="opt ${on ? "sel" : ""}" data-act="svPick" data-k="${q.k}" data-v="${v}" style="min-height:44px;font-size:15px;padding:8px 12px">${esc(label)}</button>`; };
-  const body = SURVEY.map((q, i) => `<div class="stack" style="gap:6px;align-self:stretch"><b>${i + 1}. ${esc(q.q)}</b><span class="muted small">${esc(q.ko)}</span>
-    ${q.type === "scale" ? `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${[1, 2, 3, 4, 5].map(n => opt(q, n, String(n))).join("")}</div><div class="row between muted small"><span>Not at all · 전혀</span><span>A lot · 많이</span></div>`
-      : `<div class="opts" style="gap:6px">${q.opts.map(([v, l]) => opt(q, v, l)).join("")}</div>`}</div>`).join("");
-  el.innerHTML = `<div class="cel-card" style="text-align:left;max-height:86vh;overflow:auto;gap:14px"><span class="eyebrow">For parents · 부모님께</span><h2 style="margin:0">How is Vocaboo going?</h2>
-    <p class="muted small" style="margin:0">2 minutes. Your answers help us make Vocaboo better during the free beta. 2분이면 끝나요. 베타 기간 동안 앱을 개선하는 데 큰 도움이 돼요!<br>🔒 Anonymous: your name and email are not attached. 익명으로 전송돼요.</p>
-    <div class="stack" style="gap:6px;align-self:stretch"><b>Overall, how would you rate Vocaboo?</b><span class="muted small">전체적으로 몇 점을 주시겠어요?</span>
+  const body = SURVEY.map((q, i) => `<div class="stack" style="gap:6px;align-self:stretch"><b>${i + 1}. ${esc(q.q)}</b>${UI() === "en" ? "" : `<span class="muted small">${esc(q.ko)}</span>`}
+    ${q.type === "scale" ? `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${[1, 2, 3, 4, 5].map(n => opt(q, n, String(n))).join("")}</div><div class="row between muted small"><span>${TL("Not at all · 전혀", "Not at all")}</span><span>${TL("A lot · 많이", "A lot")}</span></div>`
+      : `<div class="opts" style="gap:6px">${q.opts.map(([v, l]) => opt(q, v, TL(l, l.split(" · ")[0]))).join("")}</div>`}</div>`).join("");
+  el.innerHTML = `<div class="cel-card" style="text-align:left;max-height:86vh;overflow:auto;gap:14px"><span class="eyebrow">${TL("For parents · 부모님께", "For parents")}</span><h2 style="margin:0">How is Vocaboo going?</h2>
+    <p class="muted small" style="margin:0">2 minutes. Your answers help us make Vocaboo better during the free beta.${TL(" 2분이면 끝나요. 베타 기간 동안 앱을 개선하는 데 큰 도움이 돼요!", "")}<br>🔒 Anonymous: your name and email are not attached.${TL(" 익명으로 전송돼요.", "")}</p>
+    <div class="stack" style="gap:6px;align-self:stretch"><b>Overall, how would you rate Vocaboo?</b>${UI() === "en" ? "" : `<span class="muted small">전체적으로 몇 점을 주시겠어요?</span>`}
       <div class="row" style="gap:4px;justify-content:center">${[1, 2, 3, 4, 5].map(n => `<button data-act="svStar" data-n="${n}" aria-label="${n} stars" style="background:none;box-shadow:none;min-height:52px;padding:0 4px;font-size:40px;color:${n <= SV.stars ? "#FFC93C" : "#D9D4EA"}">★</button>`).join("")}</div></div>
     ${body}
-    <div class="stack" style="gap:6px;align-self:stretch"><b>${SURVEY.length + 1}. Anything you'd like to tell us?</b><span class="muted small">자유롭게 의견을 남겨 주세요 (선택)</span>
+    <div class="stack" style="gap:6px;align-self:stretch"><b>${SURVEY.length + 1}. Anything you'd like to tell us?</b>${UI() === "en" ? "" : `<span class="muted small">자유롭게 의견을 남겨 주세요 (선택)</span>`}
       <textarea id="svTxt" rows="4" maxlength="2000" style="font:inherit;font-size:16px;padding:12px 14px;border-radius:18px;border:2px solid var(--line);width:100%;resize:vertical">${esc(SV.txt || "")}</textarea></div>
-    <button class="big primary" data-act="svSend">Send · 보내기</button><button class="ghost" data-act="svLater" style="align-self:center">Later · 나중에</button></div>`;
+    <button class="big primary" data-act="svSend">${TL("Send · 보내기", "Send")}</button><button class="ghost" data-act="svLater" style="align-self:center">${TL("Later · 나중에", "Later")}</button></div>`;
   if (old) { const oc = old.querySelector(".cel-card"), sc = oc.scrollTop; oc.innerHTML = el.querySelector(".cel-card").innerHTML; oc.scrollTop = sc; return; }
   document.body.appendChild(el);
 }
 function svKeepText() { const t = document.getElementById("svTxt"); if (t && SV) SV.txt = t.value; }
 async function surveySend() {
-  svKeepText(); if (!SV.stars) { toast("Tap the stars first · 별점을 눌러 주세요"); document.querySelector("#survey .cel-card").scrollTop = 0; return; }
+  svKeepText(); if (!SV.stars) { toast(TL("Tap the stars first · 별점을 눌러 주세요", "Tap the stars first")); document.querySelector("#survey .cel-card").scrollTop = 0; return; }
   try { await setDoc("anonFeedback/" + anonId(), { kind: "survey", at: Date.now(), due: SV.due, stars: SV.stars, answers: SV.a, text: String(SV.txt || "").slice(0, 2000) }); } catch (e) { toast("Couldn't send. Please try again later."); return; }
   const S = Object.assign({}, ST.survey || {}); if (SV.due === "d30") S.d30 = Date.now(); else S.d7 = Date.now(); delete S.snooze; ST.survey = S; ST.surveyNow = false; saveST();
-  const el = document.getElementById("survey"); if (el) el.remove(); SV = null; toast("Thank you so much! 감사합니다 💜"); render();
+  const el = document.getElementById("survey"); if (el) el.remove(); SV = null; toast(TL("Thank you so much! 감사합니다 💜", "Thank you so much! 💜")); render();
 }
 function surveyLater() { const S = Object.assign({}, ST.survey || {}); if (S.snoozed) { if (SV.due === "d30") S.d30 = "skipped"; else S.d7 = "skipped"; } else { S.snooze = Date.now() + 2 * 864e5; S.snoozed = true; }
   ST.survey = S; ST.surveyNow = false; saveST(); const el = document.getElementById("survey"); if (el) el.remove(); SV = null; }
@@ -2321,8 +2357,8 @@ const INAPP = /KAKAOTALK|Instagram|FBAN|FBAV|NAVER|Line\/|DaumApps|everytimeApp|
 function openOutside() { const url = location.href;
   if (/KAKAOTALK/i.test(navigator.userAgent)) { location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(url); return; }
   if (OS === "android") { location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end"; return; }
-  try { navigator.clipboard.writeText(url); toast("Link copied. Paste it in Safari"); } catch (e) { toast("Open this link in Safari: " + url); } }
-function inappBanner() { return INAPP ? `<div class="notice stack" style="gap:8px"><b>⚠️ You're inside ${/KAKAOTALK/i.test(navigator.userAgent) ? "KakaoTalk" : /Instagram/i.test(navigator.userAgent) ? "Instagram" : "another app"}'s browser</b><span class="small">Sound and the microphone may not work here. Open Vocaboo in ${OS === "android" ? "Chrome" : "Safari"} instead. 다른 앱 안의 브라우저에서는 소리/마이크가 안 될 수 있어요.</span><button class="primary" data-act="openOutside">Open in ${OS === "android" ? "Chrome" : "Safari"}</button></div>` : ""; }
+  const br = OS === "android" ? "Chrome" : "Safari"; try { navigator.clipboard.writeText(url); toast("Link copied. Paste it in " + br); } catch (e) { toast("Open this link in " + br + ": " + url); } }
+function inappBanner() { return INAPP ? `<div class="notice stack" style="gap:8px"><b>⚠️ You're inside ${/KAKAOTALK/i.test(navigator.userAgent) ? "KakaoTalk" : /Instagram/i.test(navigator.userAgent) ? "Instagram" : "another app"}'s browser</b><span class="small">Sound and the microphone may not work here. Open Vocaboo in ${OS === "android" ? "Chrome" : "Safari"} instead.${TL(" 다른 앱 안의 브라우저에서는 소리/마이크가 안 될 수 있어요.", "")}</span><button class="primary" data-act="openOutside">Open in ${OS === "android" ? "Chrome" : "Safari"}</button></div>` : ""; }
 function soundTest() { const id = BY.hello ? "hello" : BANK[0].id; speak(id, "w"); setTimeout(() => { if (player.paused && !(window.speechSynthesis && speechSynthesis.speaking)) toast("If you heard nothing: turn up the volume and turn off silent mode"); }, 1500); }
 
 /* ---------- install to home screen ---------- */
@@ -2383,13 +2419,13 @@ function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInte
   return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
 
 /* ---------- "new version" popup ---------- */
-const APP_VER = "90210a7cef"; let VER_SNOOZE = 0;
+const APP_VER = "62e66adc14"; let VER_SNOOZE = 0;
 async function checkVersion() {
   if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
   try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
     if (j.v && j.v !== APP_VER) {
       const el = document.createElement("div"); el.className = "cel"; el.id = "verPop";
-      el.innerHTML = `<div class="cel-card"><div class="cel-icon">✨</div><h2>New version ready!</h2><p class="muted">Vocaboo just got better. Tap to update. It only takes a second.</p><p class="muted small">새 버전이 있어요! 눌러서 업데이트하세요.</p><button class="big primary" data-act="verUpdate" data-v="${esc(j.v)}">Update now</button><button class="ghost" data-act="verLater">Later</button></div>`;
+      el.innerHTML = `<div class="cel-card"><div class="cel-icon">✨</div><h2>New version ready!</h2><p class="muted">Vocaboo just got better. Tap to update. It only takes a second.</p>${UI() === "en" ? "" : `<p class="muted small">새 버전이 있어요! 눌러서 업데이트하세요.</p>`}<button class="big primary" data-act="verUpdate" data-v="${esc(j.v)}">Update now</button><button class="ghost" data-act="verLater">Later</button></div>`;
       document.body.appendChild(el); } } catch (e) {}
 }
 setTimeout(checkVersion, 8000); setInterval(checkVersion, 10 * 60000);
@@ -2399,11 +2435,11 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) chec
 function gradeInfoHtml() {
   const rows = [["K–2", "Kindergarten – 2nd grade", "초등 1–2학년 수준 (원어민)", "happy, jump, friend"], ["3–5", "3rd – 5th grade", "초등 3–5학년 수준", "explore, protect, journey"], ["6–8", "6th – 8th grade (middle school)", "초6 – 중2 수준", "analyze, contrast, essential"],
     ["9–12", "9th – 12th grade (high school)", "중3 – 고3 수준", "inevitable, ambiguous, scrutinize"], ["12+", "Beyond high school", "대학 이상", "ubiquitous, pragmatic"]];
-  return `<details class="card" style="cursor:pointer"><summary style="font-weight:800;font-size:18px">What do the numbers mean? <span class="muted" style="font-weight:500">· 숫자의 뜻</span></summary>
-    <div class="goal-rows" style="margin-top:6px"><div class="goal-row"><span class="goal-n">4.5</span><div><div class="goal-t">A US school grade</div><div class="muted small">How many English words an American student of that grade knows. 미국 학년 기준 · 그 학년 원어민만큼 단어를 안다는 뜻</div></div></div>
-    <div class="goal-row"><span class="goal-n">.5</span><div><div class="goal-t">How far into the year</div><div class="muted small">4.0 = start of 4th grade, 4.5 = middle. 4.0 = 4학년 초, 4.5 = 4학년 중간</div></div></div></div>
-    <table class="gtable"><tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}<br><span class="muted small">${r[2]}</span><br><span class="small" style="color:var(--violet)">e.g. ${r[3]}</span></td></tr>`).join("")}</tbody></table>
-    <p class="small" style="border-left:3px solid var(--accent);padding-left:10px">For kids learning English as a second language, a few grades below their age is normal. What matters is that the number goes up.<br><span class="muted">영어를 외국어로 배우는 아이는 나이보다 몇 학년 낮게 나오는 게 보통이에요. 꾸준히 올라가는 게 중요해요.</span></p></details>`; }
+  return `<details class="card" style="cursor:pointer"><summary style="font-weight:800;font-size:18px">What do the numbers mean? ${UI() === "en" ? "" : `<span class="muted" style="font-weight:500">· 숫자의 뜻</span>`}</summary>
+    <div class="goal-rows" style="margin-top:6px"><div class="goal-row"><span class="goal-n">4.5</span><div><div class="goal-t">A US school grade</div><div class="muted small">How many English words an American student of that grade knows.${TL(" 미국 학년 기준 · 그 학년 원어민만큼 단어를 안다는 뜻", "")}</div></div></div>
+    <div class="goal-row"><span class="goal-n">.5</span><div><div class="goal-t">How far into the year</div><div class="muted small">4.0 = start of 4th grade, 4.5 = middle.${TL(" 4.0 = 4학년 초, 4.5 = 4학년 중간", "")}</div></div></div></div>
+    <table class="gtable"><tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}${UI() === "en" ? "" : `<br><span class="muted small">${r[2]}</span>`}<br><span class="small" style="color:var(--violet)">e.g. ${r[3]}</span></td></tr>`).join("")}</tbody></table>
+    <p class="small" style="border-left:3px solid var(--accent);padding-left:10px">For kids learning English as a second language, a few grades below their age is normal. What matters is that the number goes up.${UI() === "en" ? "" : `<br><span class="muted">영어를 외국어로 배우는 아이는 나이보다 몇 학년 낮게 나오는 게 보통이에요. 꾸준히 올라가는 게 중요해요.</span>`}</p></details>`; }
 
 /* ---------- family profiles (one parent login, several kids) ---------- */
 let FAM = null, FAMPIN = null, PARENT_OK = 0;
@@ -2421,8 +2457,8 @@ async function startFamily(forcePicker) {
 function renderWho() {
   const card = (f, i) => { const st = f.st || {}; const nm = (st.profile && st.profile.name) || (i === 0 ? "My first child" : "New child");
     return `<button class="who-card" data-act="pickKid" data-sid="${esc(f.sid)}"><span class="avatar" style="width:72px;height:72px;font-size:32px;background:${AV_COLORS[i % AV_COLORS.length]}">${esc(nm[0].toUpperCase())}</span><b>${esc(nm)}</b><span class="muted small">${st.rejected ? "Not approved" : st.approved === false && st.profile ? "Waiting for approval" : st.level ? esc(gradeWord(st.level.g)) : st.profile ? "Level test next" : "Not set up yet"}</span></button>`; };
-  $app.innerHTML = `<section class="hero" style="text-align:center;padding-bottom:70px"><div class="stack" style="align-items:center;gap:8px;padding-top:20px">${buddy("happy", 90)}<h1>Who's learning today?</h1><p class="muted">누가 공부할까요?</p></div></section>
-    <div class="who-grid" style="margin-top:-48px;position:relative">${(FAM || []).map(card).join("")}${(FAM || []).length < 6 ? `<button class="who-card add" data-act="addKid"><span class="avatar" style="width:72px;height:72px;font-size:34px;background:var(--violet-soft);color:var(--violet)">+</span><b>Add a child</b><span class="muted small">아이 추가</span></button>` : ""}</div>
+  $app.innerHTML = `<section class="hero" style="text-align:center;padding-bottom:70px"><div class="stack" style="align-items:center;gap:8px;padding-top:20px">${buddy("happy", 90)}<h1>Who's learning today?</h1>${UI() === "en" ? "" : `<p class="muted">누가 공부할까요?</p>`}</div></section>
+    <div class="who-grid" style="margin-top:-48px;position:relative">${(FAM || []).map(card).join("")}${(FAM || []).length < 6 ? `<button class="who-card add" data-act="addKid"><span class="avatar" style="width:72px;height:72px;font-size:34px;background:var(--violet-soft);color:var(--violet)">+</span><b>Add a child</b>${UI() === "en" ? "" : `<span class="muted small">아이 추가</span>`}</button>` : ""}</div>
     <p class="muted small" style="text-align:center">Each child has their own words, level, streak and progress.</p>
     <button class="ghost" data-act="whoSignout" style="align-self:center">Sign out</button>`;
 }
@@ -2448,7 +2484,7 @@ function openParent(then) { PIN_FLOW = { mode: FAMPIN ? "enter" : "set", entry: 
 function drawPin() {
   const old = document.getElementById("pinPad"); if (old) old.remove(); if (!PIN_FLOW) return;
   const F = PIN_FLOW; const title = F.mode === "set" ? "Create a parent PIN" : F.mode === "confirm" ? "Type the PIN again" : F.mode === "forgot" ? "Forgot your PIN?" : "Parents only";
-  const sub = F.mode === "set" ? "4 numbers your child doesn't know. 아이가 모르는 4자리 숫자" : F.mode === "confirm" ? "" : F.mode === "forgot" ? "Type your Vocaboo account password to make a new PIN." : "Enter your 4-digit PIN · 부모님 비밀번호";
+  const sub = F.mode === "set" ? TL("4 numbers your child doesn't know. 아이가 모르는 4자리 숫자", "4 numbers your child doesn't know.") : F.mode === "confirm" ? "" : F.mode === "forgot" ? "Type your Vocaboo account password to make a new PIN." : TL("Enter your 4-digit PIN · 부모님 비밀번호", "Enter your 4-digit PIN");
   const el = document.createElement("div"); el.className = "cel"; el.id = "pinPad";
   el.innerHTML = `<div class="cel-card" style="gap:12px"><div class="cel-icon">👨‍👩‍👧</div><h2 style="margin:0">${title}</h2>${sub ? `<p class="muted small" style="margin:0">${sub}</p>` : ""}
     ${F.mode === "forgot" ? `<input id="pinPw" type="password" autocomplete="current-password" placeholder="Account password" style="min-height:52px;width:100%;border-radius:16px;border:2px solid var(--line);padding:0 14px;font:inherit;font-size:18px"><button class="big primary" data-act="pinForgotGo">Continue</button>`
@@ -2484,7 +2520,7 @@ function renderParent() {
   const L = ST.level; const g0 = ST.goal ? ST.goal.from : L ? L.g : 0; const goalPct = ST.goal && L ? Math.max(0, Math.min(100, (L.g - g0) / Math.max(0.1, ST.goal.g - g0) * 100)) : 0;
   const times = (ST.push && ST.push.times) || [17];
   const hourSel = (i) => `<select data-change="remTime" data-i="${i}" style="min-height:46px;border-radius:14px;border:2px solid var(--line);padding:0 10px;font:inherit;font-size:16px;background:#fff"><option value="">Off</option>${Array.from({ length: 17 }, (_, k) => k + 6).map(h => `<option value="${h}" ${times[i] === h ? "selected" : ""}>${h < 12 ? h + ":00 am" : h === 12 ? "12:00 pm" : (h - 12) + ":00 pm"}</option>`).join("")}</select>`;
-  $app.innerHTML = `<div class="topbar"><button class="x" data-act="parentClose" aria-label="Back">${I.back}</button><span class="count" style="flex:1">For parents · 부모님</span><span style="width:44px;flex:none"></span></div>
+  $app.innerHTML = `<div class="topbar"><button class="x" data-act="parentClose" aria-label="Back">${I.back}</button><span class="count" style="flex:1">${TL("For parents · 부모님", "For parents")}</span><span style="width:44px;flex:none"></span></div>
    <section class="hero" style="padding:18px 20px"><div class="row" style="gap:12px"><span class="avatar big">${esc((firstName() || "?")[0].toUpperCase())}</span><div class="stack" style="gap:2px"><h1 style="margin:0;font-size:26px">${esc(firstName())}'s week</h1><span class="muted">${L ? esc(gradeWord(L.g)) : ""}${ageOf(ST) != null ? " · age " + ageOf(ST) : ""}</span></div></div></section>
    <div class="tiles"><div class="tile"><b>${mins}</b><span>minutes this week</span></div><div class="tile"><b>${days}/7</b><span>days studied</span></div><div class="tile"><b>${qz.length}</b><span>quizzes${avg != null ? " · avg " + avg + "%" : ""}</span></div></div>
    <div class="tiles"><div class="tile"><b>${streakNow()}🔥</b><span>day streak${ST.freezes ? " · ❄️" + ST.freezes : ""}</span></div><div class="tile"><b>${mastered}/${ids.length}</b><span>this week's words mastered</span></div><div class="tile"><b>${totalMastered}</b><span>words mastered total (${learned} studied)</span></div></div>
@@ -2492,17 +2528,17 @@ function renderParent() {
    <div class="card"><h3>Needs more practice</h3>${tricky.length ? `<div class="chips">${tricky.map(([id, n]) => `<span class="chip">${esc(BY[id].w)} · ${esc(gloss(BY[id]))} <b>×${n}</b></span>`).join("")}</div>` : `<p class="muted">No misses this week. 👏</p>`}</div>
    <div class="card"><h3>Reminder times 🔔</h3><p class="muted small">Choose up to 3 times a day. ${pushOn() ? "" : "Reminders are off on this phone. Turn them on below."}</p><div class="row" style="gap:8px">${hourSel(0)}${hourSel(1)}${hourSel(2)}</div>${pushOn() ? "" : `<button class="big primary" data-act="pushOn">Turn on reminders</button>`}</div>
    ${planCard()}
-   <div class="card"><h3>Word meanings</h3><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">English + 한국어</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
+   <div class="card"><h3>Word meanings</h3><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">${TL("English + 한국어", "English + Korean")}</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
    <div class="card"><h3>Parent PIN</h3><div class="row"><button data-act="pinChange">Change PIN</button></div></div>
-   <button class="big primary icon-l" data-act="weekCard">📸 Weekly card · 이번 주 카드</button>
+   <button class="big primary icon-l" data-act="weekCard">${TL("📸 Weekly card · 이번 주 카드", "📸 Weekly card")}</button>
    ${resetCard()}
-   ${SID !== ME ? `<div class="card"><h3>Remove this child's profile</h3><p class="muted small">Deletes ${esc(firstName() || "this child")}'s profile and all their learning records from this account. This can't be undone. 이 자녀 프로필과 학습 기록을 모두 삭제해요.</p><button data-act="removeKid" style="color:#B3261E">Remove profile…</button></div>` : ""}
+   ${SID !== ME ? `<div class="card"><h3>Remove this child's profile</h3><p class="muted small">Deletes ${esc(firstName() || "this child")}'s profile and all their learning records from this account. This can't be undone.${TL(" 이 자녀 프로필과 학습 기록을 모두 삭제해요.", "")}</p><button data-act="removeKid" style="color:#B3261E">Remove profile…</button></div>` : ""}
    <button class="big" data-act="switchKid">👥 Switch or add child</button>
    <button class="big" data-act="signoutNow">Sign out</button>`;
 }
 function saveRemTime(i, v) { const t = ((ST.push && ST.push.times) || [17]).slice(); while (t.length < 3) t.push(null); t[i] = v === "" ? null : +v;
   const clean = [...new Set(t.filter(x => x != null))].sort((a, b) => a - b);
-  ST.push = Object.assign({}, ST.push || {}, { times: clean, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }); saveST(); toast(clean.length ? "Reminders at " + clean.map(h => (h > 12 ? h - 12 : h) + (h < 12 ? "am" : "pm")).join(", ") : "Reminders off"); render(); }
+  ST.push = Object.assign({}, ST.push || {}, { times: clean, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }); saveST(); if (view.name !== "setup") toast(clean.length ? TL("알림 ", "Reminders: ") + clean.map(h => HOUR_KO(h)).join(", ") : TL("알림 없음", "No reminders")); render(); }
 
 /* ---------- streak freeze ---------- */
 // earn 1 freeze for every 5 quizzes finished (hold up to 2). A freeze covers one missed day.
@@ -2606,9 +2642,9 @@ function renderMap() {
     } });
   const defs = "";
   const totalStars = weeks.reduce((t, k) => t + starsFor(k), 0) + Object.values(ST.bosses || {}).reduce((a, b) => a + b, 0);
-  $app.innerHTML = `${previewBar()}<div class="row between" style="padding-top:18px;padding-right:52px"><div class="stack" style="gap:2px"><h1 style="margin:0">내 단어 세계</h1><span class="muted small">${esc(WORLDS[Math.floor(curIdx / PER_WORLD) % WORLDS.length].name)} · ${esc(WORLDS[Math.floor(curIdx / PER_WORLD) % WORLDS.length].ko)}</span></div><span class="pill sun" style="font-size:15px">⭐ ${totalStars}</span></div>
+  $app.innerHTML = `${previewBar()}<div class="row between" style="padding-top:18px;padding-right:52px"><div class="stack" style="gap:2px"><h1 style="margin:0">${TL("내 단어 세계", "My word world")}</h1><span class="muted small">${esc(WORLDS[Math.floor(curIdx / PER_WORLD) % WORLDS.length].name)}${UI() === "en" ? "" : " · " + esc(WORLDS[Math.floor(curIdx / PER_WORLD) % WORLDS.length].ko)}</span></div><span class="pill sun" style="font-size:15px">⭐ ${totalStars}</span></div>
     <div class="map-wrap" id="mapWrap"><svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">${bg}${art}${path}${isl}</svg></div>
-    <div class="card"><h3>별 모으기</h3><p class="small" style="margin:0">⭐ 이번 주 단어 배우기 &nbsp; ⭐⭐ 퀴즈 4일 이상 &nbsp; ⭐⭐⭐ 이번 주 이야기까지 끝내기</p><p class="muted small" style="margin:0">섬 4개마다 보스 리뷰가 나와요. 예전 단어를 아직 기억하는지 확인하는 20문제! 새 섬은 매주 열려요.</p></div>`;
+    <div class="card"><h3>${TL("별 모으기", "Collect stars")}</h3><p class="small" style="margin:0">${TL("⭐ 이번 주 단어 배우기 &nbsp; ⭐⭐ 퀴즈 4일 이상 &nbsp; ⭐⭐⭐ 이번 주 이야기까지 끝내기", "⭐ Learn this week's words &nbsp; ⭐⭐ Quiz on 4+ days &nbsp; ⭐⭐⭐ Finish this week's story too")}</p><p class="muted small" style="margin:0">${TL("섬 4개마다 보스 리뷰가 나와요. 예전 단어를 아직 기억하는지 확인하는 20문제! 새 섬은 매주 열려요.", "Every 4 islands there's a boss review: 20 questions to see if you still remember old words. A new island opens every week.")}</p></div>`;
   const cur = document.querySelector(`[data-act="isle"][data-i="${curIdx}"]`); if (cur && !renderMap._scrolled) { renderMap._scrolled = true; setTimeout(() => cur.scrollIntoView({ block: "center" }), 60); }
 }
 function isleSheet(i) {
@@ -2984,7 +3020,7 @@ function settingsHtml() {
 /* ---------- events ---------- */
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-act]"); if (!b) return; const a = b.dataset.act;
-  if (a === "obGoal" || a === "obLang" || a === "suWords" || a === "setTheme" || a === "flFace" || a === "pickKid") try { sfx("pop"); } catch (e) {}
+  if (a === "obGoal" || a === "obLang" || a === "obUi" || a === "suWords" || a === "setTheme" || a === "flFace" || a === "pickKid") try { sfx("pop"); } catch (e) {}
   if (a === "speak") { speak(b.dataset.id, b.dataset.tag); return; }
   if (a === "say") { say(b.dataset.text, b.dataset.rate ? +b.dataset.rate : undefined); return; }
   if (a === "reload") return location.reload();
@@ -3062,9 +3098,12 @@ document.addEventListener("click", async ev => {
   if (a === "obLang") { ST._lang = b.dataset.v; document.querySelectorAll('[data-act="obLang"]').forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false")); return obReady(true); }
   if (a === "helloGo") { ST.greetDay = today(); saveST(); TAB = "today"; view = { name: "tabs" }; return render(); }
   if (a === "obIntroGo") { OB_INTRO = false; OB_DIR = 1; return render(); }
+  if (a === "obUi") { setUi(b.dataset.v); OB_DIR = 0; return render(); }
+  if (a === "obUiGo") { if (!(ST.settings && ST.settings.ui)) return; OB_UI = false; OB_DIR = 1; return render(); }
   if (a === "obBack") { stashOnboard(); OB_DIR = -1; if (OB === 0) { OB_INTRO = true; return render(); } OB = Math.max(0, OB - 1); render(); return mascotAct("act-nod", 500); }
   if (a === "obGoal") { const g = new Set(ST._goals || []); g.has(b.dataset.v) ? g.delete(b.dataset.v) : g.add(b.dataset.v); ST._goals = [...g]; b.setAttribute("aria-pressed", g.has(b.dataset.v) ? "true" : "false"); mascotHappy(g.size > 0); return obReady(true); }
   if (a === "setLang") { ST.settings = Object.assign({}, ST.settings || {}, { lang: b.dataset.v }); saveST(); return render(); }
+  if (a === "setUi") { setUi(b.dataset.v); return render(); } // setUi saves (saveST) and mirrors to localStorage
   if (a === "startLevel") { LIS = 0; return startLevelTest(false); }
   if (a === "skipLevel" && IS_OWNER) return startLevelTest(true);
   if (a === "ltPick") return levelAnswer(b.dataset.id);
@@ -3093,7 +3132,7 @@ document.addEventListener("click", async ev => {
   if (a === "sheetTestOut") { closeSheet(); return startTestOut(); }
   if (a === "packLearn") { const pk = PACK_PENDING; closeSheet(); if (pk) startTraining(pk.ids, pk.reason); return; }
   if (a === "packGo") { const v = view; return startTraining(v.rest, v.reason); }
-  if (a === "trainWeak") { const st = shuffle(starIds()).slice(0, 8); if (!st.length) { sheet(`<div style="display:flex;justify-content:center">${bubbo("think", 90)}</div><h2>헷갈리는 단어</h2><p class="muted">아직 담은 단어가 없어. 단어 카드나 플래시카드에서 <b>☆</b>을 누르면 여기에 모여서 따로 연습할 수 있어.</p><button class="big primary" data-act="sheetClose">알겠어</button>`); return; } return startTraining(st, "weak"); }
+  if (a === "trainWeak") { const st = shuffle(starIds()).slice(0, 8); if (!st.length) { sheet(`<div style="display:flex;justify-content:center">${bubbo("think", 90)}</div><h2>${TL("헷갈리는 단어", "Tricky words")}</h2><p class="muted">${TL("아직 담은 단어가 없어. 단어 카드나 플래시카드에서 <b>☆</b>을 누르면 여기에 모여서 따로 연습할 수 있어.", "No words here yet. Tap <b>☆</b> on a word card or flashcard and it will land here for extra practice.")}</p><button class="big primary" data-act="sheetClose">${TL("알겠어", "Got it")}</button>`); return; } return startTraining(st, "weak"); }
   if (a === "star") return toggleStar(b.dataset.id);
   if (a === "trainOne") return startTraining([b.dataset.id], "free");
   if (a === "pick") return answer(null, b.dataset.id);
@@ -3211,7 +3250,7 @@ document.addEventListener("submit", ev => { ev.preventDefault(); const f = ev.ta
 document.addEventListener("input", ev => { if (ev.target.dataset.input === "obReady") obReady(true); });
 document.addEventListener("change", async ev => {
   if (ev.target.dataset.change === "myPlan") return savePlan();
-  if (ev.target.dataset.change === "remTime") return saveRemTime(+ev.target.dataset.i, ev.target.value);
+  if (ev.target.dataset.change === "remTime") { OB_DIR = 0; return saveRemTime(+ev.target.dataset.i, ev.target.value); }
   if (ev.target.dataset.change === "obDobSel") { stashOnboard(); const g = id => +(document.getElementById(id) || {}).value || 0; const y = g("obY"), m = g("obM"); let d = g("obD");
     if (y && m && d > new Date(y, m, 0).getDate()) d = new Date(y, m, 0).getDate(); ST._dobP = [y, m, d];
     ST._dob = y && m && d ? y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0") : ""; OB_DIR = 0; render(); return mascotWrite(); }
@@ -3225,17 +3264,17 @@ function renderLogin() {
   const m = view.mode || "in"; const field = (id, label, type, ac, extra) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="${type}" autocomplete="${ac}" autocapitalize="off" autocorrect="off" spellcheck="false" ${extra || ""}></div>`;
   const tabs = `<div class="seg" style="width:100%"><button type="button" data-act="lgMode" data-m="in" aria-pressed="${m === "in"}" style="flex:1">Sign in</button><button type="button" data-act="lgMode" data-m="up" aria-pressed="${m === "up"}" style="flex:1">Create account</button></div>`;
   let body;
-  if (m === "forgot") body = `<h2>Forgot password?</h2><p class="muted small">Type your email. We'll send a link to make a new password. 비밀번호 재설정 링크를 이메일로 보내 드려요.</p>${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}
+  if (m === "forgot") body = `<h2>Forgot password?</h2><p class="muted small">Type your email. We'll send a link to make a new password.${TL(" 비밀번호 재설정 링크를 이메일로 보내 드려요.", "")}</p>${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}
     ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}${view.ok ? `<div class="fb good">${esc(view.ok)}</div>` : ""}<button class="big primary" type="submit">Send reset link</button><button type="button" class="ghost" data-act="lgMode" data-m="in" style="align-self:center">Back to sign in</button>`;
-  else if (m === "up") body = `${tabs}<p class="muted small">Parents: create one account for each child. Your teacher approves new accounts before they can start. 새 계정은 선생님 승인 후 사용할 수 있어요.</p>
+  else if (m === "up") body = `${tabs}<p class="muted small">Parents: create one account for each child. Your teacher approves new accounts before they can start.${TL(" 새 계정은 선생님 승인 후 사용할 수 있어요.", "")}</p>
     ${field("lgEmail", "Email", "text", "username", 'inputmode="email"')}${field("lgPw", "Password (6+ characters)", "password", "new-password")}${field("lgPw2", "Type the password again", "password", "new-password")}
     ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Create account</button>`;
   else body = `${tabs}${field("lgEmail", "Email", "text", "username", `inputmode="email" value="${esc(savedEmail())}"`)}${field("lgPw", "Password", "password", "current-password")}
-    <label class="row" style="gap:10px;font-weight:700"><input id="lgRemember" type="checkbox" ${rememberOn() ? "checked" : ""} style="width:22px;height:22px;flex:none"><span>Remember me · 로그인 유지</span></label>
+    <label class="row" style="gap:10px;font-weight:700"><input id="lgRemember" type="checkbox" ${rememberOn() ? "checked" : ""} style="width:22px;height:22px;flex:none"><span>${TL("Remember me · 로그인 유지", "Remember me")}</span></label>
     ${view.err ? `<div class="fb bad">${esc(view.err)}</div>` : ""}<button class="big primary" type="submit">Sign in</button><button type="button" class="ghost" data-act="lgMode" data-m="forgot" style="align-self:center">Forgot password?</button>`;
   $app.innerHTML = (INAPP ? `<div style="padding-top:12px">${inappBanner()}</div>` : "") + `<section class="hero" style="text-align:center;padding-bottom:80px"><div class="stack" style="align-items:center;gap:10px;padding-top:30px">${buddy("happy", 110)}<h1>Vocaboo</h1><p class="muted">Train your words every day</p></div></section>
   <form class="card" data-form="login" style="margin-top:-56px;position:relative">${body}</form>${installBanner()}
-  <a href="../" class="muted small" style="align-self:center;font-weight:800;text-decoration:none;padding:8px">ℹ️ What is Vocaboo? · Vocaboo 소개</a>`;
+  <a href="../" class="muted small" style="align-self:center;font-weight:800;text-decoration:none;padding:8px">ℹ️ ${TL("What is Vocaboo? · Vocaboo 소개", "What is Vocaboo?")}</a>`;
 }
 const savedEmail = () => { try { return localStorage.getItem("vb_email") || ""; } catch (e) { return ""; } };
 const rememberOn = () => { try { return !localStorage.getItem("vb_norem"); } catch (e) { return true; } };

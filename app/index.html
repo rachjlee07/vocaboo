@@ -210,7 +210,7 @@ pre.report{white-space:pre-wrap;font-family:var(--f-mono);font-size:13px;backgro
 .story-text{font-size:19px;line-height:1.7;margin:0;flex:1}
 .story-ko{font-size:15px;line-height:1.6}
 .sword{font:inherit;font-weight:800;color:var(--violet);background:var(--violet-soft);border:0;border-radius:8px;padding:0 4px;min-height:0;line-height:inherit;cursor:pointer}
-.tour{position:fixed;inset:0;z-index:80}
+.tour{position:fixed;inset:0;z-index:80;pointer-events:none}.tour .tour-card{pointer-events:auto}
 .tour-hole{position:fixed;border-radius:22px;box-shadow:0 0 0 9999px rgba(30,22,56,.62);outline:3px solid var(--sun);pointer-events:none;transition:all .2s}
 .tour-card{position:fixed;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));max-width:480px;margin:0 auto;background:#fff;border-radius:22px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 20px 40px -12px rgba(0,0,0,.45)}
 .dmiss{color:var(--coral-ink);background:var(--coral-soft);border-radius:4px;padding:0 3px;font-weight:800}
@@ -518,7 +518,7 @@ mark{text-decoration-color:var(--accent)}
 @keyframes obIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
 @keyframes obInL{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
 .ob-wrap{min-height:0;justify-content:flex-start;padding-top:8px;padding-bottom:0}
-.ob-wrap .ob-foot{margin-top:auto;padding-top:10px}
+.ob-wrap .ob-foot{margin-top:auto;padding-top:10px;position:sticky;bottom:0;background:var(--bg);padding-bottom:4px;z-index:5}
 .ob-wrap .ob-foot .primary:disabled{background:var(--soft);color:var(--muted);opacity:1}
 .ob-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:10px 0 0}
 .ob-hero .bub{border-radius:18px;font-size:22px;font-weight:400;font-family:var(--f-ko);padding:14px 18px;position:relative;animation:introIn .4s .25s both;max-width:300px}
@@ -554,7 +554,7 @@ mark{text-decoration-color:var(--accent)}
 <script src="config.js?v=3e8cab0bd4"></script>
 <script src="words.js?v=d28539be18"></script>
 <script src="stories.js?v=453278059e"></script>
-<script src="app.js?v=db4ca43364"></script>
+<script src="app.js?v=edb99ad472"></script>
 <script type="module" src="fb.js?v=64ffe6dd4f"></script>
 </body>
 </html>
