@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Vocaboo</title>
-<meta name="description" content="아이 레벨에 맞춘 영어 단어를 하루 몇 개씩. 듣고, 말하고, 쓰고, 이야기로 읽으며 오래 기억해요. 무료 베타 진행 중.">
+<meta name="description" content="아이 레벨에 맞춘 영어 단어를 하루 몇 개씩. 듣고, 말하고, 쓰고, 이야기로 다시 만나요. 무료 베타 진행 중.">
 <meta property="og:title" content="Vocaboo · 하루 5분 영어 단어 습관">
 <meta property="og:description" content="아이 레벨에 맞춘 영어 단어를 하루 몇 개씩. 무료 베타 진행 중.">
 <meta property="og:image" content="https://rachjlee07.github.io/vocaboo/app/icon-512.png">
@@ -13,15 +13,13 @@
 <link rel="icon" href="app/icon-192.png">
 <link rel="apple-touch-icon" href="app/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-/* Layout: the page reads as one dictionary entry for "vocaboo": headword, pronunciation, numbered senses, usage, notes. */
+/* Layout: an Apple-style product page. One idea per section, centered headline + one line, then a visual. Lots of air. */
 :root{
-  --paper:#FFFFFF; --ink:#16141D; --ink-2:#4A4657; --rule:#E6E3EE;
-  --marker:#FFE24A;            /* highlighter yellow */
-  --violet:#5B3FD9;            /* the app's own color, used sparingly */
-  --tint:#F5F3FA;
-  --f-kr-display:"Jua","Black Han Sans","IBM Plex Sans KR",sans-serif;
+  --bg:#FFFFFF; --soft:#F5F5F7; --ink:#16141D; --ink-2:#6E6A7C; --rule:#E8E6EE;
+  --marker:#FFE24A; --marker-ink:#16141D;
+  --f-ko:"Jua","IBM Plex Sans KR",sans-serif;
   --f-display:"Bricolage Grotesque","IBM Plex Sans KR",system-ui,sans-serif;
   --f-body:"IBM Plex Sans KR",system-ui,-apple-system,sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -29,150 +27,153 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.7 var(--f-body);word-break:keep-all;overflow-wrap:break-word;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 var(--f-body);word-break:keep-all;overflow-wrap:break-word;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit}
-.wrap{max-width:1080px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
-.mono{font-family:var(--f-mono)}
-.mark{background:linear-gradient(transparent 58%,var(--marker) 58%,var(--marker) 92%,transparent 92%);padding:0 .08em}
-h1,h2,h3{text-wrap:balance;margin:0}
-:focus-visible{outline:3px solid var(--violet);outline-offset:3px;border-radius:6px}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:400}
+p{margin:0}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:8px}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px))}
+.center{text-align:center}
 
-/* top bar */
-.top{display:flex;justify-content:space-between;align-items:center;padding-block:18px;border-bottom:1px solid var(--rule)}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font:800 21px/1 var(--f-display);letter-spacing:-.02em}
-.brand img{width:34px;height:34px;border-radius:9px}
-.top nav{display:flex;align-items:center;gap:22px;font-size:15px}
-.top nav a{text-decoration:none;color:var(--ink-2)}
-.top nav a:hover{color:var(--ink)}
-.top nav a.btn{color:#fff}
-.btn{display:inline-flex;align-items:center;gap:10px;min-height:52px;padding:0 24px;border-radius:12px;background:var(--ink);color:#fff;text-decoration:none;font:700 17px/1 var(--f-body);transition:transform .15s,box-shadow .15s}
-.btn:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--marker)}
-.btn.small{min-height:40px;padding:0 16px;font-size:14px;border-radius:10px}
-.link{font-weight:700;text-decoration:none;border-bottom:2px solid var(--marker)}
+/* nav: thin, sticky, quiet */
+.nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--rule)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:52px}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;font:800 18px/1 var(--f-display);letter-spacing:-.02em}
+.brand img{width:26px;height:26px;border-radius:7px}
+.nav nav{display:flex;align-items:center;gap:22px;font-size:13px;color:var(--ink-2)}
+.nav nav a{text-decoration:none}.nav nav a:hover{color:var(--ink)}
+.pill-btn{display:inline-flex;align-items:center;min-height:30px;padding:0 14px;border-radius:999px;background:var(--ink);color:#fff !important;font-weight:700;font-size:13px;text-decoration:none}
+@media (max-width:560px){.nav nav a:not(.pill-btn){display:none}}
 
-/* hero: the headword */
-.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;align-items:center;padding-block:64px 72px}
-.entry-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;color:var(--ink-2);font-family:var(--f-mono);font-size:15px}
-.entry-meta .pos{font-style:italic}
-.headword{font:800 clamp(64px,11vw,132px)/.9 var(--f-display);letter-spacing:-.045em;margin:10px 0 18px}
-.headword .dot{color:var(--violet)}
-.def{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:baseline;max-width:34em}
-.def .n{font:500 15px var(--f-mono);color:var(--ink-2)}
-.def p{margin:0}
-.def .kr{font:400 clamp(26px,3.4vw,36px)/1.25 var(--f-kr-display);letter-spacing:-.01em}
-.def .en{color:var(--ink-2);font-size:16px}
-.hero .cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;margin-top:30px}
-.hero .fine{font-size:14px;color:var(--ink-2);margin-top:14px}
+/* shared section rhythm */
+section{padding-block:96px}
+.eyebrow{font:500 13px var(--f-mono);letter-spacing:.12em;color:var(--ink-2);text-transform:uppercase}
+.h-xl{font:400 clamp(44px,8vw,84px)/1.08 var(--f-ko);letter-spacing:-.01em}
+.h-l{font:400 clamp(34px,5.6vw,56px)/1.12 var(--f-ko)}
+.lead{font-size:clamp(18px,2.2vw,21px);line-height:1.55;color:var(--ink-2);max-width:32em;margin-inline:auto}
+.stack{display:flex;flex-direction:column;align-items:center;gap:18px}
+.ctas{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:22px;margin-top:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:50px;padding:0 26px;border-radius:999px;background:var(--ink);color:#fff;text-decoration:none;font:700 17px/1 var(--f-body);transition:transform .15s}
+.btn:hover{transform:scale(1.03)}
+.more{color:var(--ink);text-decoration:none;font-weight:700;font-size:17px}
+.more::after{content:" ›"}
+.more:hover{text-decoration:underline}
+.fine{font-size:13px;color:var(--ink-2)}
+.mark{background:linear-gradient(transparent 60%,var(--marker) 60%,var(--marker) 92%,transparent 92%)}
 
-/* flashcard demo */
-.demo{display:flex;flex-direction:column;align-items:center;gap:16px}
-.stack{position:relative;width:min(100%,340px);aspect-ratio:3/4;perspective:1200px}
-.stack .under{position:absolute;inset:0;border-radius:22px;background:var(--tint);border:1.5px solid var(--rule)}
-.stack .under.u1{transform:rotate(-5deg) translate(-10px,8px)}
-.stack .under.u2{transform:rotate(4deg) translate(10px,4px);background:#FFF8C9;border-color:#F1E39A}
-.card{position:absolute;inset:0;border:0;padding:0;background:none;cursor:pointer;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.7,.2,1)}
-.card.flipped{transform:rotateY(180deg)}
-.face{position:absolute;inset:0;border-radius:22px;background:var(--paper);border:1.5px solid var(--ink);box-shadow:6px 6px 0 var(--ink);backface-visibility:hidden;-webkit-backface-visibility:hidden;display:flex;flex-direction:column;padding:26px;text-align:left;color:var(--ink)}
-.face.back{transform:rotateY(180deg);background:var(--ink);color:#fff;box-shadow:6px 6px 0 var(--marker)}
-.face .row{display:flex;justify-content:space-between;align-items:center;font:500 13px var(--f-mono);color:var(--ink-2)}
-.face.back .row{color:#BDB8CC}
-.face .w{font:800 clamp(42px,6vw,56px)/1 var(--f-display);letter-spacing:-.03em;margin:auto 0 8px}
-.face .ipa{font:400 17px var(--f-mono);color:var(--ink-2)}
-.face .tap{font-size:14px;color:var(--ink-2);margin-top:auto}
-.face.back .ko{font:400 34px/1.2 var(--f-kr-display);margin:auto 0 10px;color:var(--marker)}
-.face.back .gl{font-size:16px;color:#E4E1EE}
-.face.back .ex{margin-top:auto;font-size:15px;color:#E4E1EE;border-top:1px solid #3A3647;padding-top:12px}
-.face.back .ex b{color:#fff}
-.demo-ctl{display:flex;align-items:center;gap:12px;font:500 13px var(--f-mono);color:var(--ink-2)}
-.demo-ctl button{border:1.5px solid var(--ink);background:var(--paper);border-radius:10px;min-height:40px;padding:0 14px;font:700 14px var(--f-body);cursor:pointer;color:var(--ink)}
-.demo-ctl button:hover{background:var(--marker)}
+/* hero */
+.hero{padding-block:72px 40px}
+.hero .bub-wrap{position:relative;margin-top:36px;display:flex;justify-content:center;align-items:flex-end;gap:28px;flex-wrap:wrap}
+.bub-wrap>svg.bubbo{width:180px;height:216px}
+.speech{position:relative;background:var(--soft);border-radius:22px;padding:16px 20px;font:400 20px/1.4 var(--f-ko);max-width:270px;text-align:left;margin-bottom:120px}
+.speech::after{content:"";position:absolute;left:-8px;bottom:22px;width:18px;height:18px;background:var(--soft);transform:rotate(45deg);border-radius:3px}
+@media (max-width:560px){.speech{margin-bottom:0;order:-1}.speech::after{left:50%;bottom:-8px;margin-left:-9px}}
 
-/* sections share the dictionary rhythm: a label column and a content column */
-.sec{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px 48px;padding-block:64px;border-top:1px solid var(--rule)}
-.sec-label{font:500 13px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);padding-top:10px}
-.sec-label b{display:block;font:400 26px/1.2 var(--f-kr-display);letter-spacing:0;text-transform:none;color:var(--ink);margin-top:6px}
-.sec h2{font:400 clamp(30px,4.2vw,44px)/1.2 var(--f-kr-display);margin-bottom:12px}
-.lede{color:var(--ink-2);max-width:36em;margin:0 0 30px}
+/* phone with the real Home screen, simplified */
+.phone{width:290px;max-width:100%;border:10px solid var(--ink);border-radius:46px;background:#fff;padding:22px 16px 18px;box-shadow:0 30px 60px rgba(22,20,29,.16);text-align:left;font-size:13px}
+.phone .row{display:flex;justify-content:space-between;align-items:center}
+.phone .mono{font:500 10px var(--f-mono);color:var(--ink-2);letter-spacing:.06em}
+.phone .say{display:flex;gap:8px;align-items:flex-end;margin:14px 0}
+.phone .say .b{width:46px;height:55px;flex:none;display:block}.phone .say .b svg{width:46px;height:55px}
+.phone .say p{background:var(--soft);border-radius:14px 14px 14px 4px;padding:8px 10px;font-size:12.5px;line-height:1.4}
+.phone .today{border:1.5px solid var(--ink);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:9px}
+.phone .today h4{margin:0;font:800 16px var(--f-display)}
+.phone .pts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.phone .pt{border-radius:10px;background:var(--soft);padding:7px 7px 6px}
+.phone .pt.on{background:var(--marker)}
+.phone .pt b{display:block;font:800 13px var(--f-display)}
+.phone .pt span{font-size:10px;color:var(--ink-2)}
+.phone .go{background:var(--ink);color:#fff;border-radius:10px;text-align:center;padding:9px;font-weight:700}
+.phone .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.phone .grid div{border:1.5px solid var(--rule);border-radius:12px;padding:9px;font-weight:700;font-size:11.5px}
+.phone .grid small{display:block;font-weight:400;color:var(--ink-2);font-size:10px}
 
-/* senses = the real 3-step sequence */
-.senses{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-.senses li{display:grid;grid-template-columns:56px minmax(0,1fr);gap:16px;padding-block:22px;border-bottom:1px solid var(--rule)}
-.senses li:first-child{padding-top:0}
-.senses .n{font:800 34px/1 var(--f-display);color:var(--violet)}
-.senses h3{font:700 21px/1.35 var(--f-body);margin-bottom:6px}
-.senses p{margin:0;color:var(--ink-2);max-width:40em}
-.senses .eg{font-family:var(--f-mono);font-size:14px;color:var(--ink);background:var(--tint);border-radius:8px;padding:2px 8px;display:inline-block;margin-top:10px}
+/* bento */
+.bento{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px;margin-top:56px}
+.tile{text-align:left;background:var(--soft);border-radius:28px;padding:30px 28px;display:flex;flex-direction:column;gap:10px;min-height:250px;overflow:hidden;position:relative}
+.tile h3{font:400 26px/1.25 var(--f-ko)}
+.tile p{color:var(--ink-2);font-size:16px}
+.tile .big{font:800 64px/1 var(--f-display);letter-spacing:-.04em}
+.tile .big small{font-size:22px;letter-spacing:0;margin-left:4px}
+.t-a{grid-column:span 4}.t-b{grid-column:span 2}.t-c{grid-column:span 2}.t-d{grid-column:span 4}.t-e{grid-column:span 3}.t-f{grid-column:span 3}
+.tile.yellow{background:var(--marker)}
+.tile.yellow p{color:var(--ink)}
+.tile.ink{background:var(--ink);color:#fff}.tile.ink p{color:#C9C5D6}
+.bento.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:820px){.bento,.bento.three{grid-template-columns:1fr}.t-a,.t-b,.t-c,.t-d,.t-e,.t-f{grid-column:auto}.tile{min-height:0}}
+/* tile visuals */
+.wave{display:flex;align-items:center;gap:4px;height:44px;margin-top:auto}
+.wave i{width:6px;border-radius:3px;background:var(--ink);animation:wv 1.2s ease-in-out infinite}
+.wave.mine i{background:#fff}
+@keyframes wv{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:auto}
+.cmp div{border-radius:18px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:8px;font-weight:700;font-size:14px}
+.cmp div.me{background:var(--ink);color:#fff}
+.chat{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.chat span{max-width:85%;border-radius:16px;padding:9px 12px;font-size:14px;line-height:1.45;background:#fff}
+.chat span.me{align-self:flex-end;background:var(--ink);color:#fff}
+.chat ins{text-decoration:none;background:var(--marker);color:var(--ink);font-weight:700;padding:0 3px;border-radius:4px}
+.chat del{color:var(--ink-2)}
+.isles{display:flex;gap:10px;align-items:flex-end;margin-top:auto}
+.isles i{display:block;width:46px;height:20px;border-radius:50%;background:#9BE37A;border:2.5px solid var(--ink)}
+.isles i.lock{background:#ECEAF2;border-color:#C9C5D6}
+.stars{font-size:22px;letter-spacing:4px;margin-top:auto}
 
-/* a week, drawn to scale */
-.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:6px}
-.day{border:1.5px solid var(--ink);border-radius:14px;padding:12px 10px 10px;display:flex;flex-direction:column;gap:8px;min-height:150px}
-.day .d{font:500 12px var(--f-mono);color:var(--ink-2)}
-.day .n{font:800 34px/1 var(--f-display)}
-.day .lab{font-size:13px;color:var(--ink-2);margin-top:auto;line-height:1.35}
-.day .pips{display:flex;gap:4px;flex-wrap:wrap}
-.day .pips i{width:12px;height:12px;border-radius:3px;background:var(--marker);border:1px solid #D9BE1F}
-.day.rest{border-style:dashed;border-color:#B9B4C7}
-.day.rest .n{color:#B9B4C7}
-.week-note{font-size:15px;color:var(--ink-2);margin-top:16px;max-width:44em}
-.week-note b{color:var(--ink)}
-
-/* usage: features as a definition list */
-.usage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 40px;margin:0}
-.usage div{padding-block:18px;border-bottom:1px solid var(--rule)}
-.usage dt{font:700 19px/1.35 var(--f-body);margin-bottom:4px}
-.usage dd{margin:0;color:var(--ink-2);font-size:16px}
+/* week strip */
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-top:48px}
+.day{border-radius:20px;background:var(--soft);padding:18px 8px;text-align:center}
+.day b{display:block;font:800 34px/1 var(--f-display)}
+.day span{font:500 11px var(--f-mono);color:var(--ink-2);letter-spacing:.06em}
+.day small{display:block;font-size:12px;color:var(--ink-2);margin-top:6px}
+.day.on{background:var(--marker)}.day.on span,.day.on small{color:var(--ink)}
+@media (max-width:560px){.week{grid-template-columns:repeat(4,minmax(0,1fr))}}
 
 /* parents */
-.parents{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:40px;align-items:start}
-.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:18px}
-.plist li{padding-left:22px;position:relative}
-.plist li::before{content:"";position:absolute;left:0;top:.62em;width:10px;height:10px;background:var(--marker);border:1.5px solid var(--ink);border-radius:2px}
-.plist b{display:block;font-size:18px}
-.plist span{color:var(--ink-2);font-size:16px}
-.wcard{background:var(--violet);color:#fff;border-radius:20px;padding:24px;box-shadow:6px 6px 0 var(--ink);max-width:360px;justify-self:center;width:100%}
-.wcard .meta{font:500 12px var(--f-mono);opacity:.75}
-.wcard .big{font:800 30px/1.1 var(--f-display);letter-spacing:-.02em;margin:12px 0 4px}
-.wcard .yay{color:var(--marker);font-weight:700}
-.wcard .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-.wcard .grid div{background:rgba(255,255,255,.14);border-radius:12px;padding:10px 12px;font:800 20px/1.1 var(--f-display)}
-.wcard .grid small{display:block;font:500 12px var(--f-body);opacity:.8;margin-top:4px}
-.wcard .words{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
-.wcard .words span{background:#fff;color:var(--violet);border-radius:999px;padding:3px 12px;font-weight:700;font-size:14px}
-.caption{font:400 13px var(--f-mono);color:var(--ink-2);text-align:center;margin-top:12px}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px;align-items:center;margin-top:56px;text-align:left}
+@media (max-width:820px){.split{grid-template-columns:1fr}}
+.points{display:flex;flex-direction:column}
+.points div{padding:20px 0;border-top:1px solid var(--rule)}
+.points div:last-child{border-bottom:1px solid var(--rule)}
+.points b{display:block;font-size:19px}
+.points span{color:var(--ink-2)}
+.wcard{background:var(--ink);color:#fff;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:14px;max-width:380px;width:100%;justify-self:center}
+.wcard .m{font:500 11px var(--f-mono);opacity:.7;letter-spacing:.06em}
+.wcard h4{margin:0;font:800 26px/1.15 var(--f-display)}
+.wcard .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.wcard .nums div{background:rgba(255,255,255,.08);border-radius:14px;padding:10px}
+.wcard .nums b{display:block;font:800 22px var(--f-display);color:var(--marker)}
+.wcard .nums span{font-size:11px;opacity:.75}
+.wcard .chips{display:flex;flex-wrap:wrap;gap:6px}
+.wcard .chips span{background:var(--marker);color:var(--ink);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700}
 
-/* notes: install + faq */
-.install{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
-.install section{border:1.5px solid var(--ink);border-radius:16px;padding:20px 22px}
-.install h3{font:700 19px var(--f-body);margin-bottom:6px}
-.install ol{margin:0;padding-left:20px;color:var(--ink-2)}
-.install li{margin:3px 0}
-.tip{margin-top:18px;background:#FFF8C9;border-radius:12px;padding:12px 16px;font-size:15px}
-.faq details{border-bottom:1px solid var(--rule);padding-block:16px}
-.faq summary{font:700 18px var(--f-body);cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px}
+/* install */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:48px;text-align:left}
+@media (max-width:700px){.two{grid-template-columns:1fr}}
+.two .box{background:var(--soft);border-radius:28px;padding:30px}
+.two h3{font:400 24px var(--f-ko);margin-bottom:12px}
+.two ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.tip{margin-top:20px;font-size:14px;color:var(--ink-2)}
+
+/* faq */
+.faq{max-width:720px;margin:40px auto 0;text-align:left}
+.faq details{border-top:1px solid var(--rule);padding:20px 4px}
+.faq details:last-child{border-bottom:1px solid var(--rule)}
+.faq summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px;font-weight:700;font-size:18px}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:"+";font:500 22px/1 var(--f-mono);color:var(--violet)}
-.faq details[open] summary::after{content:"−"}
-.faq p{margin:10px 0 0;color:var(--ink-2);max-width:42em}
+.faq summary::after{content:"+";font:400 24px/1 var(--f-display);color:var(--ink-2);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq p{color:var(--ink-2);margin-top:10px}
 
 /* closing */
-.close{border-top:1px solid var(--rule);padding-block:72px 40px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:24px}
-.close h2{font:400 clamp(34px,5vw,56px)/1.15 var(--f-kr-display)}
-.close p{color:var(--ink-2);margin:10px 0 0}
-footer{padding-block:24px 40px;font:400 13px var(--f-mono);color:var(--ink-2);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;border-top:1px solid var(--rule)}
+.closing{background:var(--soft)}
+.closing svg.bubbo{width:120px;height:144px}
+footer{padding-block:28px;font-size:12px;color:var(--ink-2);border-top:1px solid var(--rule)}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 
-@media (max-width:860px){
-  .hero{grid-template-columns:1fr;gap:44px;padding-block:40px 56px}
-  .sec{grid-template-columns:1fr;gap:10px;padding-block:48px}
-  .sec-label{padding-top:0}
-  .usage,.install,.parents{grid-template-columns:1fr}
-  .week{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .day{min-height:120px}
-  .top nav a:not(.btn){display:none}
-}
-@media (max-width:860px){.stack{width:min(100%,280px)}}
-@media (max-width:420px){.week{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (prefers-reduced-motion:reduce){.card{transition:none}.btn{transition:none}html{scroll-behavior:auto}}
-.hero-bubbo{display:flex;justify-content:center;margin:-10px 0 6px}.hero-bubbo svg{width:150px;height:180px}
+/* gentle reveal on scroll: content is visible by default; only animates if JS adds .js */
+.js .reveal{transform:translateY(18px);transition:transform .8s cubic-bezier(.2,.8,.2,1)}
+.js .reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion: reduce){.js .reveal{transform:none;transition:none}.wave i{animation:none}}
 /* ---------- Bubbo rig: moods + moves ---------- */
 .bubbo{flex:none;overflow:visible}
 .bubbo .body{transform-box:view-box;transform-origin:100px 196px}
@@ -239,29 +240,23 @@ footer{padding-block:24px 40px;font:400 13px var(--f-mono);color:var(--ink-2);di
 @keyframes bbWaveBody{0%,100%{transform:rotate(0) scale(1)}20%,80%{transform:rotate(-7deg) scale(.98,1.03)}}
 .bubbo.act-shake .body{animation:bbShake .5s ease-in-out both}
 @keyframes bbShake{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <a class="brand" href="#"><img src="app/icon-192.png" alt="">Vocaboo</a>
-    <nav><a href="#how">사용법</a><a href="#parents">부모님</a><a href="#faq">FAQ</a><a class="btn small" href="app/">앱 열기</a></nav>
-  </header>
+<header class="nav"><div class="wrap"><a class="brand" href="#top"><img src="app/icon-192.png" alt="">Vocaboo</a>
+  <nav><a href="#how">하루 공부</a><a href="#features">기능</a><a href="#parents">부모님</a><a href="#faq">FAQ</a><a class="pill-btn" href="app/">시작하기</a></nav></div></header>
 
-  <main>
-    <section class="hero" aria-labelledby="hw">
-      <div>
-        <div class="entry-meta"><span>vo·ca·boo</span><span>/voʊˈkæ.buː/</span><span class="pos">n.</span><span>무료 베타</span></div>
-        <h1 class="headword" id="hw">vocaboo<span class="dot">.</span></h1>
-        <div class="def">
-          <span class="n">1.</span><p class="kr">하루 5분, 아이 레벨에 맞춘 <span class="mark">영어 단어 습관</span></p>
-          <span class="n"></span><p class="en">A few English words a day, at your child's level. Listen, say, spell and read until they stick.</p>
-        </div>
-        <div class="cta"><a class="btn" href="app/">무료로 시작하기 <span aria-hidden="true">→</span></a><a class="link" href="#how">어떻게 하나요?</a></div>
-        <p class="fine">가입 1분 · 카드 등록 없음 · iPhone, Android 모두</p>
-      </div>
-      <div class="demo">
-        <div class="hero-bubbo" aria-hidden="true"><svg class="bubbo m-happy act-wake idle" width="200" height="240" viewBox="0 0 200 240" aria-hidden="true">
+<main id="top">
+<section class="hero center"><div class="wrap stack">
+  <span class="eyebrow">무료 베타</span>
+  <h1 class="h-xl">하루 5분,<br>단어가 <span class="mark">내 것</span>이 되는 시간.</h1>
+  <p class="lead">아이 레벨에 맞춘 영어 단어를 하루 몇 개씩. 듣고, 말하고, 쓰고, 이야기로 다시 만나요.</p>
+  <div class="ctas"><a class="btn" href="app/">무료로 시작하기</a><a class="more" href="#how">어떻게 하나요</a></div>
+  <p class="fine">가입 1분 · 카드 등록 없음 · iPhone, Android 모두</p>
+  <div class="bub-wrap">
+    <div class="speech">안녕! 난 <b>Bubbo</b>야.<br>오늘 단어 3개만 같이 해 볼까?</div>
+    <svg class="bubbo m-happy act-wake idle" width="200" height="240" viewBox="0 0 200 240" aria-hidden="true">
     <ellipse class="shadow" cx="100" cy="212" rx="54" ry="7" fill="#16141D" opacity=".1"/><g class="puff"><circle cx="34" cy="206" r="10" fill="#D9D4EA"/><circle cx="166" cy="206" r="10" fill="#D9D4EA"/></g>
     <ellipse class="foot foot-l" cx="78" cy="204" rx="17" ry="9" fill="#16141D"/><ellipse class="foot foot-r" cx="122" cy="204" rx="17" ry="9" fill="#16141D"/>
     <g class="body"><path d="M62 40h76a32 32 0 0 1 32 32v66a32 32 0 0 1-32 32H86c-10 2-24 12-44 20 8-8 10-14 10-22-12-4-22-12-22-22V72a32 32 0 0 1 32-32z" fill="#FFE24A"/>
@@ -271,136 +266,131 @@ footer{padding-block:24px 40px;font:400 13px var(--f-mono);color:var(--ink-2);di
     <g clip-path="url(#bb1l)"><g class="pupils"><ellipse cx="79" cy="108" rx="9.5" ry="12" fill="#16141D"/><circle cx="75" cy="100" r="3.5" fill="#FFFFFF"/></g>
       <rect class="lid" x="54" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M54 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><g><clipPath id="bb1r"><ellipse cx="124" cy="104" rx="19" ry="23"/></clipPath><ellipse cx="124" cy="104" rx="19" ry="23" fill="#FFFFFF"/>
     <g clip-path="url(#bb1r)"><g class="pupils"><ellipse cx="127" cy="108" rx="9.5" ry="12" fill="#16141D"/><circle cx="123" cy="100" r="3.5" fill="#FFFFFF"/></g>
-      <rect class="lid" x="102" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M102 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><path d="M88 136q12 12 24 0" stroke="#16141D" stroke-width="5" fill="none" stroke-linecap="round"/></g></g></svg></div>
-        <div class="stack">
-          <span class="under u1"></span><span class="under u2"></span>
-          <button class="card" id="card" aria-label="카드를 눌러 뒤집기">
-            <span class="face front"><span class="row"><span id="fPos">adj.</span><span id="fGr">Grade 3</span></span><span class="w" id="fW">brave</span><span class="ipa" id="fIpa">/breɪv/</span><span class="tap">눌러서 뜻 보기</span></span>
-            <span class="face back"><span class="row"><span>뜻</span><span id="bN">1 / 5</span></span><span class="ko" id="bKo">용감한</span><span class="gl" id="bGl">not afraid to do something hard or scary</span><span class="ex" id="bEx">The <b>brave</b> girl jumped into the cold lake.</span></span>
-          </button>
-        </div>
-        <div class="demo-ctl"><span>앱 속 플래시카드 그대로</span><button id="next" type="button">다음 단어 →</button></div>
-      </div>
-    </section>
+      <rect class="lid" x="102" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M102 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><path d="M88 136q12 12 24 0" stroke="#16141D" stroke-width="5" fill="none" stroke-linecap="round"/></g></g></svg>
+    <div class="phone" aria-hidden="true">
+      <div class="row"><span class="mono">DAY 2 OF 5 · 15 WORDS</span><span class="mono">🔥 5</span></div>
+      <div class="say"><span class="b"><svg class="bubbo idle" width="200" height="240" viewBox="0 0 200 240" aria-hidden="true">
+    <ellipse class="shadow" cx="100" cy="212" rx="54" ry="7" fill="#16141D" opacity=".1"/><g class="puff"><circle cx="34" cy="206" r="10" fill="#D9D4EA"/><circle cx="166" cy="206" r="10" fill="#D9D4EA"/></g>
+    <ellipse class="foot foot-l" cx="78" cy="204" rx="17" ry="9" fill="#16141D"/><ellipse class="foot foot-r" cx="122" cy="204" rx="17" ry="9" fill="#16141D"/>
+    <g class="body"><path d="M62 40h76a32 32 0 0 1 32 32v66a32 32 0 0 1-32 32H86c-10 2-24 12-44 20 8-8 10-14 10-22-12-4-22-12-22-22V72a32 32 0 0 1 32-32z" fill="#FFE24A"/>
+      <path d="M100 130c24 0 40 10 40 22 0 10-16 16-40 16s-40-6-40-16c0-12 16-22 40-22z" fill="#FFF0A0" opacity=".9"/>
+      <g class="fl fl-l"><path d="M40 116c-18 4 -26 30 -14 54c6 12 20 10 22 -6c2 -20 -2 -38 -8 -48z" fill="#F5C21A"/></g><g class="nb"><rect x="54" y="138" width="86" height="64" rx="7" fill="#FFFDF5" stroke="#E0D9C8" stroke-width="2"/><path d="M64 138v64" stroke="#E7DFC9" stroke-width="2"/><circle cx="64" cy="148" r="2.5" fill="#B9B0A0"/><circle cx="64" cy="162" r="2.5" fill="#B9B0A0"/><circle cx="64" cy="176" r="2.5" fill="#B9B0A0"/><circle cx="64" cy="190" r="2.5" fill="#B9B0A0"/>
+    <path class="scrib" d="M72 154c10-5 18 7 28 1s14-6 26 0" stroke="#16141D" stroke-width="3.5" fill="none" stroke-linecap="round"/><path class="scrib" d="M72 170c8 6 18-5 28 2s14-4 26 0" stroke="#16141D" stroke-width="3.5" fill="none" stroke-linecap="round" style="animation-delay:.25s"/><path class="scrib" d="M72 186h40" stroke="#16141D" stroke-width="3.5" fill="none" stroke-linecap="round" style="animation-delay:.45s"/></g><g class="fl fl-r"><path d="M160 116c18 4 26 30 14 54c-6 12 -20 10 -22 -6c-2 -20 2 -38 8 -48z" fill="#F5C21A"/><g class="pen"><rect x="170" y="134" width="9" height="40" rx="2" fill="#FFC93C"/><rect x="170" y="134" width="9" height="7" rx="2" fill="#FF8FB0"/><path d="M170 174h9l-4.5 9z" fill="#F0C9A0"/><path d="M172.5 179h4l-2 4z" fill="#16141D"/></g></g><g class="face"><g><clipPath id="bb1l"><ellipse cx="76" cy="104" rx="19" ry="23"/></clipPath><ellipse cx="76" cy="104" rx="19" ry="23" fill="#FFFFFF"/>
+    <g clip-path="url(#bb1l)"><g class="pupils"><ellipse cx="79" cy="108" rx="9.5" ry="12" fill="#16141D"/><circle cx="75" cy="100" r="3.5" fill="#FFFFFF"/></g>
+      <rect class="lid" x="54" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M54 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><g><clipPath id="bb1r"><ellipse cx="124" cy="104" rx="19" ry="23"/></clipPath><ellipse cx="124" cy="104" rx="19" ry="23" fill="#FFFFFF"/>
+    <g clip-path="url(#bb1r)"><g class="pupils"><ellipse cx="127" cy="108" rx="9.5" ry="12" fill="#16141D"/><circle cx="123" cy="100" r="3.5" fill="#FFFFFF"/></g>
+      <rect class="lid" x="102" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M102 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><path d="M88 136q12 12 24 0" stroke="#16141D" stroke-width="5" fill="none" stroke-linecap="round"/></g></g></svg></span><p>좋은 아침, 하나! 오늘은 <b>단어 3개</b>만 하면 돼.</p></div>
+      <div class="today"><div class="row"><h4>Today's words</h4><span class="mono">0 / 3</span></div>
+        <div class="pts"><div class="pt on"><b>brave</b><span>용감한</span></div><div class="pt"><b>invent</b><span>발명하다</span></div><div class="pt"><b>gentle</b><span>다정한</span></div></div>
+        <div class="go">시작하기 · 약 6분 →</div></div>
+      <div class="grid"><div>Bubbo랑 문장<small>단어 배우면 열려요</small></div><div>데일리 퀴즈<small>9문제</small></div></div>
+    </div>
+  </div>
+</div></section>
 
-    <section class="sec" id="how">
-      <div class="sec-label">How it works<b>사용법</b></div>
-      <div>
-        <h2>세 단계면 매일 습관이 돼요</h2>
-        <p class="lede">처음 한 번 레벨을 확인하고, 그다음부터는 매일 조금씩. 앱이 오늘 할 일을 순서대로 알려 줘요.</p>
-        <ol class="senses">
-          <li><span class="n">1</span><div><h3>5분 레벨 테스트</h3><p>맞히면 어려워지고 틀리면 쉬워지는 맞춤형 테스트예요. 결과는 미국 학년 기준(K–12)으로 보여 드려요.</p><span class="eg">결과 예: Grade 3.6 · 아는 단어 약 2,400개</span></div></li>
-          <li><span class="n">2</span><div><h3>하루 몇 단어씩</h3><p>단어를 듣고 세 번 따라 말하고, 예문을 읽고, 가린 다음 직접 써 봐요. 짧은 퀴즈로 확인하면 오늘 할 일 끝.</p><span class="eg">하루 평균 5–10분</span></div></li>
-          <li><span class="n">3</span><div><h3>잊을 때쯤 다시</h3><p>배운 단어는 1주, 2주, 4주 뒤에 다시 나와요. 잊어버릴 즈음 한 번 더 보는 것이 오래 기억하는 가장 확실한 방법이에요.</p><span class="eg">1주 → 2주 → 4주 복습</span></div></li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="sec">
-      <div class="sec-label">One week<b>일주일</b></div>
-      <div>
-        <h2>주 15단어면 하루 3개</h2>
-        <p class="lede">일주일 목표를 5일로 나눠요. 남은 이틀은 쉬어도 되고, 밀린 단어를 따라잡아도 돼요.</p>
-        <div class="week" role="img" aria-label="5일 동안 하루 3단어, 나머지 2일은 따라잡기">
-          <div class="day"><span class="d">DAY 1</span><span class="n">3</span><span class="pips"><i></i><i></i><i></i></span><span class="lab">새 단어</span></div>
-          <div class="day"><span class="d">DAY 2</span><span class="n">3</span><span class="pips"><i></i><i></i><i></i></span><span class="lab">새 단어</span></div>
-          <div class="day"><span class="d">DAY 3</span><span class="n">3</span><span class="pips"><i></i><i></i><i></i></span><span class="lab">새 단어</span></div>
-          <div class="day"><span class="d">DAY 4</span><span class="n">3</span><span class="pips"><i></i><i></i><i></i></span><span class="lab">새 단어</span></div>
-          <div class="day"><span class="d">DAY 5</span><span class="n">3</span><span class="pips"><i></i><i></i><i></i></span><span class="lab">새 단어</span></div>
-          <div class="day rest"><span class="d">DAY 6</span><span class="n">0</span><span class="lab">쉬거나 따라잡기</span></div>
-          <div class="day rest"><span class="d">DAY 7</span><span class="n">0</span><span class="lab">쉬거나 따라잡기</span></div>
-        </div>
-        <p class="week-note">주 10–40단어 중에서 고를 수 있어요. 더 하고 싶은 날엔 <b>“2개 더 배우기”</b>, 이미 아는 단어는 <b>빠른 확인</b>으로 건너뛰어요.</p>
-      </div>
-    </section>
-
-    <section class="sec">
-      <div class="sec-label">Usage<b>이런 걸 해요</b></div>
-      <div>
-        <h2>단어를 여러 방법으로 만나요</h2>
-        <p class="lede">한 단어를 보고, 듣고, 말하고, 쓰고, 이야기 속에서 다시 만나야 진짜 내 단어가 돼요.</p>
-        <dl class="usage">
-          <div><dt>맞춤 단어 목록</dt><dd>교육부 기본 어휘 3,000개와 미국 학년별 단어 6,000여 개 중에서, 아이 레벨보다 살짝 높은 단어를 골라요.</dd></div>
-          <div><dt>말하기 연습</dt><dd>단어와 예문을 소리 내어 말해요. r/l, f/p, b/v 같은 한국어 발음 차이는 너그럽게 인정해요.</dd></div>
-          <div><dt>AI 문장 코치</dt><dd>배운 단어로 직접 문장을 만들면 AI가 고쳐 주고, 한 단계 높은 표현도 알려 줘요.</dd></div>
-          <div><dt>이번 주의 이야기</dt><dd>그 주에 배운 단어로 만든 짧은 이야기를 원어민 목소리로 듣고 읽어요.</dd></div>
-          <div><dt>섬을 여는 지도</dt><dd>한 주를 마칠 때마다 섬이 하나씩 열리고, 4주마다 보스 복습이 기다려요.</dd></div>
-          <div><dt>형제자매 프로필</dt><dd>계정 하나에 아이마다 프로필을 따로 만들어요. 레벨도 기록도 각자.</dd></div>
-        </dl>
-      </div>
-    </section>
-
-    <section class="sec" id="parents">
-      <div class="sec-label">For parents<b>부모님께</b></div>
-      <div class="parents">
-        <div>
-          <h2>잔소리 대신, 한눈에</h2>
-          <p class="lede">PIN으로 잠긴 부모님 공간에서 이번 주 기록을 확인하고 학습량을 조절해요.</p>
-          <ul class="plist">
-            <li><b>이번 주 리포트</b><span>공부한 날, 퀴즈 점수, 자주 틀리는 단어를 한 화면에.</span></li>
-            <li><b>원하는 시간에 알림</b><span>하루 최대 3번, 정한 시간에만 알려 줘요.</span></li>
-            <li><b>학습량은 직접</b><span>주 10–40단어, 퀴즈 길이, 글자 크기까지 바꿀 수 있어요.</span></li>
-            <li><b>주간 카드</b><span>한 주가 끝나면 자랑하기 좋은 카드가 만들어져요. 가족 단톡방이나 인스타그램에 올려 보세요.</span></li>
-          </ul>
-        </div>
-        <div>
-          <div class="wcard" aria-label="주간 카드 예시">
-            <div class="meta">VOCABOO · WEEK OF 10/13 – 10/19</div>
-            <div class="big">Hana learned 15 new words this week!</div>
-            <div class="yay">Amazing work!</div>
-            <div class="grid"><div>5-day<small>streak</small></div><div>5/7<small>quiz days</small></div><div>Gr. 3.6<small>word level</small></div><div>420<small>XP this week</small></div></div>
-            <div class="words"><span>brave</span><span>journey</span><span>invent</span><span>gentle</span><span>harvest</span></div>
-          </div>
-          <p class="caption">실제 앱에서 만들어지는 주간 카드</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="sec">
-      <div class="sec-label">Install<b>설치</b></div>
-      <div>
-        <h2>홈 화면에 추가하면 앱처럼</h2>
-        <p class="lede">앱스토어 없이 휴대폰 홈 화면에 아이콘을 만들어 써요.</p>
-        <div class="install">
-          <section><h3>iPhone · iPad</h3><ol><li><b>Safari</b>에서 이 페이지를 열어요.</li><li>아래 <b>공유 버튼</b>을 눌러요.</li><li><b>홈 화면에 추가</b>를 누르면 끝.</li></ol></section>
-          <section><h3>Android</h3><ol><li><b>Chrome</b>에서 이 페이지를 열어요.</li><li>오른쪽 위 <b>⋮</b> 메뉴를 눌러요.</li><li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>.</li></ol></section>
-        </div>
-        <p class="tip">카카오톡이나 인스타그램 안에서 열면 소리와 마이크가 안 될 수 있어요. 오른쪽 위 메뉴에서 <b>Safari / Chrome으로 열기</b>를 눌러 주세요.</p>
-      </div>
-    </section>
-
-    <section class="sec faq" id="faq">
-      <div class="sec-label">Notes<b>자주 묻는 질문</b></div>
-      <div>
-        <details><summary>정말 무료인가요?</summary><p>지금은 무료 베타 기간이에요. 베타 자리가 다 차면 정식 출시 알림 명단에 올려 드려요. 유료로 바뀌기 전에는 꼭 미리 알려 드릴게요.</p></details>
-        <details><summary>몇 살부터 쓸 수 있나요?</summary><p>나이 제한은 없어요. 레벨 테스트가 유치원 수준부터 고등학생 이상까지 맞춰 줘요. 만 14세 미만은 가입할 때 보호자 동의가 필요해요.</p></details>
-        <details><summary>하루에 얼마나 걸리나요?</summary><p>보통 5–10분이에요. 새 단어 몇 개, 짧은 퀴즈, 말하기 연습이 하루 분량이에요.</p></details>
-        <details><summary>아이 정보는 안전한가요?</summary><p>이름, 생년월일, 학습 기록만 저장하고 판매하거나 다른 사용자에게 보여 주지 않아요. 말하기 연습은 휴대폰 음성 인식을 쓰고 녹음은 저장하지 않아요. 설정에서 언제든 모든 기록을 지울 수 있어요.</p></details>
-        <details><summary>부모가 영어를 잘 못해도 괜찮을까요?</summary><p>괜찮아요. 모든 단어에 한국어 뜻과 원어민 발음이 있고, 앱이 하루 할 일을 순서대로 안내해요.</p></details>
-      </div>
-    </section>
-
-    <section class="close">
-      <div><h2>오늘 <span class="mark">첫 단어</span>부터.</h2><p>레벨 테스트는 5분이면 끝나요.</p></div>
-      <a class="btn" href="app/">무료로 시작하기 <span aria-hidden="true">→</span></a>
-    </section>
-  </main>
-  <footer><span>© Vocaboo</span><span>vo·ca·boo /voʊˈkæ.buː/ n.</span></footer>
+<section id="how" class="center"><div class="wrap stack reveal">
+  <span class="eyebrow">하루 공부</span>
+  <h2 class="h-l">오늘 할 일은<br>Bubbo가 알려 줘요.</h2>
+  <p class="lead">처음 한 번 5분 레벨 테스트. 그다음부터는 앱을 열면 오늘 할 일이 순서대로 나와요.</p>
 </div>
+<div class="wrap"><div class="bento three">
+  <div class="tile reveal"><span class="eyebrow">01</span><h3>듣고 따라 말해요</h3><p>원어민 목소리로 듣고, 세 번 소리 내어 말해요.</p><div class="wave"><i style="height:20%"></i><i style="height:60%;animation-delay:.1s"></i><i style="height:90%;animation-delay:.2s"></i><i style="height:50%;animation-delay:.3s"></i><i style="height:75%;animation-delay:.4s"></i><i style="height:35%;animation-delay:.5s"></i><i style="height:65%;animation-delay:.6s"></i></div></div>
+  <div class="tile reveal"><span class="eyebrow">02</span><h3>가리고 써 봐요</h3><p>3, 2, 1. 단어를 가린 뒤 기억해서 직접 써요.</p><div class="big" style="margin-top:auto">3·2·1</div></div>
+  <div class="tile reveal"><span class="eyebrow">03</span><h3>퀴즈로 확인해요</h3><p>짧은 퀴즈 한 번이면 오늘 끝. 틀린 단어는 다음 날 다시.</p><div class="stars">✓ ✓ ✓</div></div>
+</div></div>
+</section>
+
+<section class="center" style="padding-top:24px"><div class="wrap stack reveal">
+  <span class="eyebrow">일주일</span>
+  <h2 class="h-l">주 15단어면,<br>하루 3개.</h2>
+  <p class="lead">일주일 목표를 5일로 나눠요. 남은 이틀은 쉬거나 밀린 단어를 따라잡아요. 목표는 주 10–40단어 중에서 골라요.</p>
+</div>
+<div class="wrap"><div class="week reveal">
+  <div class="day on"><span>DAY 1</span><b>3</b><small>새 단어</small></div><div class="day on"><span>DAY 2</span><b>3</b><small>새 단어</small></div><div class="day on"><span>DAY 3</span><b>3</b><small>새 단어</small></div><div class="day on"><span>DAY 4</span><b>3</b><small>새 단어</small></div><div class="day on"><span>DAY 5</span><b>3</b><small>새 단어</small></div><div class="day"><span>DAY 6</span><b>0</b><small>쉬어요</small></div><div class="day"><span>DAY 7</span><b>0</b><small>쉬어요</small></div>
+</div></div>
+</section>
+
+<section id="features" class="center"><div class="wrap stack reveal">
+  <span class="eyebrow">기능</span>
+  <h2 class="h-l">외우는 게 아니라,<br>써 보는 단어.</h2>
+  <p class="lead">한 단어를 여러 번, 여러 방법으로 만나야 오래 기억해요.</p>
+</div>
+<div class="wrap"><div class="bento">
+  <div class="tile t-a reveal"><h3>내 목소리로 비교해요</h3><p>말한 소리가 녹음돼서 원어민 발음과 바로 비교해 들을 수 있어요.</p>
+    <div class="cmp"><div>원어민<span class="wave"><i style="height:30%"></i><i style="height:70%;animation-delay:.1s"></i><i style="height:95%;animation-delay:.2s"></i><i style="height:55%;animation-delay:.3s"></i><i style="height:80%;animation-delay:.4s"></i></span></div><div class="me">내 목소리<span class="wave mine"><i style="height:40%;animation-delay:.2s"></i><i style="height:85%;animation-delay:.3s"></i><i style="height:60%;animation-delay:.4s"></i><i style="height:90%;animation-delay:.5s"></i><i style="height:45%;animation-delay:.6s"></i></span></div></div></div>
+  <div class="tile t-b yellow reveal"><span class="eyebrow" style="color:var(--ink)">레벨 테스트</span><div class="big">5<small>분</small></div><p>맞히면 어려워지고 틀리면 쉬워져요. 결과는 미국 학년 기준으로.</p></div>
+  <div class="tile t-c reveal"><span class="eyebrow">복습</span><div class="big" style="font-size:44px">1·2·4<small>주</small></div><p>잊을 때쯤 다시 나와요. 오래 기억하는 가장 확실한 방법이에요.</p></div>
+  <div class="tile t-d reveal"><h3>Bubbo랑 문장 만들기</h3><p>배운 단어로 내 문장을 말하면, Bubbo가 고쳐 주고 한 단계 더 좋은 표현을 알려 줘요.</p>
+    <div class="chat"><span class="me">I want invent a robot for clean my room.</span><span>I want <ins>to</ins> invent a robot <del>for clean</del> <ins>that cleans</ins> my room. 아이디어 최고!</span></div></div>
+  <div class="tile t-e reveal"><h3>이번 주의 이야기</h3><p>그 주에 배운 단어로 만든 짧은 이야기를 원어민 목소리로 듣고 읽어요. 단어를 배울수록 이야기가 길어져요.</p></div>
+  <div class="tile t-f reveal"><h3>섬을 여는 지도</h3><p>한 주를 마칠 때마다 섬이 열리고 별을 모아요. 4주마다 보스 복습이 기다려요.</p><div class="isles"><i></i><i></i><i></i><i class="lock"></i></div></div>
+</div></div>
+</section>
+
+<section id="parents" class="center"><div class="wrap stack reveal">
+  <span class="eyebrow">부모님</span>
+  <h2 class="h-l">잔소리 대신,<br>한눈에.</h2>
+  <p class="lead">PIN으로 잠긴 부모님 설정에서 이번 주 기록을 보고 학습량을 조절해요.</p>
+</div>
+<div class="wrap"><div class="split">
+  <div class="points reveal">
+    <div><b>이번 주 리포트</b><span>공부한 날, 퀴즈 점수, 자주 틀리는 단어를 한 화면에.</span></div>
+    <div><b>원하는 시간에 알림</b><span>하루 1–3번, 정한 시간에만 푸시 알림. 메일은 보내지 않아요.</span></div>
+    <div><b>아이마다 따로</b><span>계정 하나에 형제자매 프로필을 각각. 레벨도 기록도 각자.</span></div>
+    <div><b>주간 카드</b><span>한 주가 끝나면 자랑하고 싶은 카드가 만들어져요.</span></div>
+  </div>
+  <div class="wcard reveal" aria-label="주간 카드 예시"><span class="m">VOCABOO · WEEK OF 10/13</span><h4>Hana learned 15 new words this week!</h4>
+    <div class="nums"><div><b>5</b><span>day streak</span></div><div><b>5/7</b><span>quiz days</span></div><div><b>3.6</b><span>word level</span></div></div>
+    <div class="chips"><span>brave</span><span>journey</span><span>invent</span><span>gentle</span><span>harvest</span></div></div>
+</div></div>
+</section>
+
+<section id="install" class="center"><div class="wrap stack reveal">
+  <span class="eyebrow">설치</span>
+  <h2 class="h-l">앱스토어 없이,<br>홈 화면에.</h2>
+  <p class="lead">한 번 추가하면 아이콘을 눌러 앱처럼 열어요.</p>
+</div>
+<div class="wrap"><div class="two reveal">
+  <div class="box"><h3>iPhone · iPad</h3><ol><li><b>Safari</b>에서 이 페이지를 열어요.</li><li>아래 <b>공유</b> 버튼을 눌러요.</li><li><b>홈 화면에 추가</b>를 누르면 끝.</li></ol></div>
+  <div class="box"><h3>Android</h3><ol><li><b>Chrome</b>에서 이 페이지를 열어요.</li><li>오른쪽 위 <b>⋮</b> 메뉴를 눌러요.</li><li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>.</li></ol></div>
+</div><p class="tip center">카카오톡이나 인스타그램 안에서 열었다면, 오른쪽 위 메뉴에서 Safari 또는 Chrome으로 열어 주세요.</p></div>
+</section>
+
+<section id="faq" class="center" style="padding-top:24px"><div class="wrap stack reveal">
+  <span class="eyebrow">FAQ</span><h2 class="h-l">자주 묻는 질문</h2>
+</div>
+<div class="wrap"><div class="faq">
+  <details><summary>정말 무료인가요?</summary><p>지금은 무료 베타 기간이에요. 자리가 다 차면 정식 출시 알림 명단에 올려 드려요. 유료로 바뀌기 전에는 꼭 미리 알려 드릴게요.</p></details>
+  <details><summary>몇 살부터 쓸 수 있나요?</summary><p>레벨 테스트가 유치원 수준부터 고등학생 이상까지 맞춰 줘요. 만 14세 미만은 가입할 때 보호자 동의가 필요해요.</p></details>
+  <details><summary>하루에 얼마나 걸리나요?</summary><p>보통 5–10분이에요. 새 단어 몇 개, 짧은 퀴즈, 말하기 연습이 하루 분량이에요.</p></details>
+  <details><summary>아이 정보는 안전한가요?</summary><p>이름, 생년월일, 학습 기록만 저장하고 판매하거나 다른 사용자에게 보여 주지 않아요. 비교용 녹음은 아이 휴대폰에만 남고 서버로 보내지 않아요. 설정에서 언제든 모든 기록을 지울 수 있어요.</p></details>
+  <details><summary>부모가 영어를 잘 못해도 괜찮을까요?</summary><p>괜찮아요. 모든 단어에 한국어 뜻과 원어민 발음이 있고, 앱이 하루 할 일을 순서대로 안내해요. 앱 화면은 한국어와 영어 중에서 고를 수 있어요.</p></details>
+</div></div>
+</section>
+
+<section class="closing center"><div class="wrap stack reveal">
+  <svg class="bubbo idle" width="200" height="240" viewBox="0 0 200 240" aria-hidden="true">
+    <ellipse class="shadow" cx="100" cy="212" rx="54" ry="7" fill="#16141D" opacity=".1"/><g class="puff"><circle cx="34" cy="206" r="10" fill="#D9D4EA"/><circle cx="166" cy="206" r="10" fill="#D9D4EA"/></g>
+    <ellipse class="foot foot-l" cx="78" cy="204" rx="17" ry="9" fill="#16141D"/><ellipse class="foot foot-r" cx="122" cy="204" rx="17" ry="9" fill="#16141D"/>
+    <g class="body"><path d="M62 40h76a32 32 0 0 1 32 32v66a32 32 0 0 1-32 32H86c-10 2-24 12-44 20 8-8 10-14 10-22-12-4-22-12-22-22V72a32 32 0 0 1 32-32z" fill="#FFE24A"/>
+      <path d="M100 130c24 0 40 10 40 22 0 10-16 16-40 16s-40-6-40-16c0-12 16-22 40-22z" fill="#FFF0A0" opacity=".9"/>
+      <g class="fl fl-l"><path d="M40 116c-18 4 -26 30 -14 54c6 12 20 10 22 -6c2 -20 -2 -38 -8 -48z" fill="#F5C21A"/></g><g class="nb"><rect x="54" y="138" width="86" height="64" rx="7" fill="#FFFDF5" stroke="#E0D9C8" stroke-width="2"/><path d="M64 138v64" stroke="#E7DFC9" stroke-width="2"/><circle cx="64" cy="148" r="2.5" fill="#B9B0A0"/><circle cx="64" cy="162" r="2.5" fill="#B9B0A0"/><circle cx="64" cy="176" r="2.5" fill="#B9B0A0"/><circle cx="64" cy="190" r="2.5" fill="#B9B0A0"/>
+    <path class="scrib" d="M72 154c10-5 18 7 28 1s14-6 26 0" stroke="#16141D" stroke-width="3.5" fill="none" stroke-linecap="round"/><path class="scrib" d="M72 170c8 6 18-5 28 2s14-4 26 0" stroke="#16141D" stroke-width="3.5" fill="none" stroke-linecap="round" style="animation-delay:.25s"/><path class="scrib" d="M72 186h40" stroke="#16141D" stroke-width="3.5" fill="none" stroke-linecap="round" style="animation-delay:.45s"/></g><g class="fl fl-r"><path d="M160 116c18 4 26 30 14 54c-6 12 -20 10 -22 -6c-2 -20 2 -38 8 -48z" fill="#F5C21A"/><g class="pen"><rect x="170" y="134" width="9" height="40" rx="2" fill="#FFC93C"/><rect x="170" y="134" width="9" height="7" rx="2" fill="#FF8FB0"/><path d="M170 174h9l-4.5 9z" fill="#F0C9A0"/><path d="M172.5 179h4l-2 4z" fill="#16141D"/></g></g><g class="face"><g><clipPath id="bb1l"><ellipse cx="76" cy="104" rx="19" ry="23"/></clipPath><ellipse cx="76" cy="104" rx="19" ry="23" fill="#FFFFFF"/>
+    <g clip-path="url(#bb1l)"><g class="pupils"><ellipse cx="79" cy="108" rx="9.5" ry="12" fill="#16141D"/><circle cx="75" cy="100" r="3.5" fill="#FFFFFF"/></g>
+      <rect class="lid" x="54" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M54 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><g><clipPath id="bb1r"><ellipse cx="124" cy="104" rx="19" ry="23"/></clipPath><ellipse cx="124" cy="104" rx="19" ry="23" fill="#FFFFFF"/>
+    <g clip-path="url(#bb1r)"><g class="pupils"><ellipse cx="127" cy="108" rx="9.5" ry="12" fill="#16141D"/><circle cx="123" cy="100" r="3.5" fill="#FFFFFF"/></g>
+      <rect class="lid" x="102" y="78" width="44" height="52" fill="#FFE24A"/><path class="hlid" d="M102 104q22 -26 44 0v30h-44z" fill="#FFE24A"/></g></g><path d="M88 136q12 12 24 0" stroke="#16141D" stroke-width="5" fill="none" stroke-linecap="round"/></g></g></svg>
+  <h2 class="h-l">오늘 첫 단어부터.</h2>
+  <p class="lead">레벨 테스트는 5분이면 끝나요.</p>
+  <div class="ctas"><a class="btn" href="app/">무료로 시작하기</a></div>
+</div></section>
+</main>
+<footer><div class="wrap"><span>© Vocaboo</span><span class="mono" style="font-family:var(--f-mono)">vo·ca·boo /voʊˈkæ.buː/ n.</span></div></footer>
 <script>
-(function(){
-  var W=[
-    ["brave","adj.","/breɪv/","Grade 3","용감한","not afraid to do something hard or scary","The <b>brave</b> girl jumped into the cold lake."],
-    ["journey","n.","/ˈdʒɜːr.ni/","Grade 4","여행, 여정","a long trip from one place to another","Our <b>journey</b> to Grandma's house took six hours."],
-    ["invent","v.","/ɪnˈvent/","Grade 4","발명하다","to make something new that never existed before","I want to <b>invent</b> a robot that cleans my room."],
-    ["gentle","adj.","/ˈdʒen.təl/","Grade 3","부드러운, 다정한","kind and careful, not rough","Be <b>gentle</b> with the little puppy."],
-    ["harvest","n.","/ˈhɑːr.vɪst/","Grade 5","수확","the time when crops are gathered from the fields","The farmers were busy with the apple <b>harvest</b>."]
-  ];
-  var i=0,card=document.getElementById("card"),$=function(id){return document.getElementById(id)};
-  function show(){var w=W[i];$("fW").textContent=w[0];$("fPos").textContent=w[1];$("fIpa").textContent=w[2];$("fGr").textContent=w[3];$("bKo").textContent=w[4];$("bGl").textContent=w[5];$("bEx").innerHTML=w[6];$("bN").textContent=(i+1)+" / "+W.length;}
-  card.addEventListener("click",function(){card.classList.toggle("flipped")});
-  $("next").addEventListener("click",function(){var go=function(){i=(i+1)%W.length;show()};if(card.classList.contains("flipped")){card.classList.remove("flipped");setTimeout(go,280)}else go();});
-  show();
+(function(){ // reveal on scroll; everything stays visible if this never runs
+  if(!("IntersectionObserver" in window)) return; document.documentElement.classList.add("js");
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target);}})},{rootMargin:"0px 0px -8% 0px"});
+  document.querySelectorAll(".reveal").forEach(function(el){io.observe(el)});
 })();
 </script>
 </body>
