@@ -323,11 +323,16 @@ function mascotEl(fill) { if (MASCOT.el && MASCOT.fill === (fill || "")) return 
 function mascotAct(cls, ms) { const sv = MASCOT.el && MASCOT.el.firstElementChild; if (!sv) return; ["act-wake", "act-run", "act-land", "act-nod", "act-cheer", "act-wave", "act-shake", "writing"].forEach(k => sv.classList.remove(k)); void sv.offsetWidth; sv.classList.add(cls); if (ms) MASCOT.tm.push(setTimeout(() => sv.classList.remove(cls), ms)); }
 function mascotWrite() { const sv = MASCOT.el && MASCOT.el.firstElementChild; if (!sv || !sv.classList.contains("hold")) return; sv.classList.remove("writing"); void sv.offsetWidth; sv.classList.add("writing"); MASCOT.tm.push(setTimeout(() => sv.classList.remove("writing"), 800)); }
 function mascotHappy(on, ms) { const sv = MASCOT.el && MASCOT.el.firstElementChild; if (!sv) return; sv.classList.toggle("m-cheer", !!on); if (ms) MASCOT.tm.push(setTimeout(() => sv.classList.remove("m-cheer"), ms)); }
+/* Safari measures things inside a CSS-zoomed box (bigger text) in unzoomed units: scale them back to screen pixels */
+function zoomFix(el) { const host = el.closest && el.closest("#app, #tabs"); if (!host) return 1; const B = document.body.classList; const z = B.contains("txt-xl") ? 1.25 : B.contains("txt-l") ? 1.12 : 1; if (z === 1) return 1; const p = document.createElement("div"); p.style.cssText = "position:absolute;left:0;top:0;width:100px;height:1px;visibility:hidden;pointer-events:none"; host.appendChild(p); const w = p.getBoundingClientRect().width; p.remove();
+  return w > 0 ? z / (w / 100) : 1; }
+function viewRect(el) { const r = el.getBoundingClientRect(); const f = zoomFix(el); if (Math.abs(f - 1) < 0.02) return r;
+  return { left: r.left * f, top: r.top * f, width: r.width * f, height: r.height * f, right: r.right * f, bottom: r.bottom * f }; }
 function mascotMove(x, y, sc, snap) { const el = MASCOT.el; if (snap) el.classList.add("snap"); el.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px) scale(${sc})`; if (snap) { void el.offsetWidth; el.classList.remove("snap"); } }
 /* after every render: if the screen has a .mslot, put the mascot there (travelling from where it was); otherwise hide it */
 function mascotSync(snap) {
   const slot = document.querySelector(".mslot"); if (!slot) { if (MASCOT.el) { MASCOT.el.remove(); MASCOT.el = null; MASCOT.key = ""; } return; }
-  const el = mascotEl(slot.dataset.fill === "auto" ? (/theme-/.test(document.documentElement.className) ? "" : "#FFFFFF") : slot.dataset.fill); const sv = el.firstElementChild; const sc = +slot.dataset.sc || 1; const r = slot.getBoundingClientRect();
+  const el = mascotEl(slot.dataset.fill === "auto" ? (/theme-/.test(document.documentElement.className) ? "" : "#FFFFFF") : slot.dataset.fill); const sv = el.firstElementChild; const sc = +slot.dataset.sc || 1; const r = viewRect(slot);
   const x = r.left + (r.width - 150) / 2; const y = r.top + r.height - 180; // feet on the slot's bottom edge, scaled about the feet
   const key = slot.dataset.key || slot.className; const fresh = MASCOT.key !== key; MASCOT.tm.forEach(clearTimeout); MASCOT.tm = [];
   sv.classList.toggle("hold", slot.dataset.hold === "1"); if (fresh) sv.classList.remove("m-cheer");
@@ -894,7 +899,7 @@ function speakHtml(e) {
   const card = tg.kind === "w"
     ? `<div class="card ink"><div class="row between"><span class="eyebrow">${esc(e.pos)} · ${esc(gradeLabel(e.g) === "–" ? "" : "Grade " + gradeLabel(e.g))}</span><span class="ipa">${esc(e.ipa)}</span></div>
         <div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div><div class="row" style="flex-wrap:nowrap;gap:6px">${starBtn(e.id)}${spk(e.id, "w")}</div></div>
-        <div class="ko hl">${esc(gloss(e))}</div><div class="row">${spk(e.id, "s", TL("천천히", "Slow"), "icon-l")}</div></div>`
+        <div class="ko"><span class="hlx">${esc(gloss(e))}</span></div><div class="row">${spk(e.id, "s", TL("천천히", "Slow"), "icon-l")}</div></div>`
     : `<div class="card ink"><span class="eyebrow">${TL(`예문 ${sp.idx} · 듣고 따라 읽기`, `Example ${sp.idx} · listen and read along`)}</span><div class="ex">${spk(e.id, tg.tag)}<p style="font-size:21px;font-weight:700">${exHtml(tg.text, e.w)}</p></div></div>`;
   let mood = "happy", line = tg.kind === "w" ? TL(`마이크를 한 번만 누르고 <b>${esc(e.w)}</b>를 ${tg.need === 1 ? "한 번" : "연달아 " + tg.need + "번"} 말해 줘.`, `Tap the mic once and say <b>${esc(e.w)}</b> ${tg.need === 1 ? "once" : tg.need + " times in a row"}.`) : TL("문장 전체를 소리 내어 읽어 봐.", "Read the whole sentence out loud.");
   if (sp.listening) { mood = "wow"; line = TL("듣고 있어… 말해 봐!", "Listening… go ahead!"); }
@@ -1753,7 +1758,7 @@ function drawTour() {
   const st = TSTEPS[TI]; const t = document.querySelector(st.sel);
   if (!t) { TI++; return drawTour(); }
   try { t.scrollIntoView({ block: "center", behavior: "instant" }); } catch (e) { t.scrollIntoView({ block: "center" }); }
-  setTimeout(() => { const r = t.getBoundingClientRect(); const pad = 8; const ov = document.createElement("div"); ov.className = "tour";
+  setTimeout(() => { const r = viewRect(t); const pad = 8; const ov = document.createElement("div"); ov.className = "tour";
     const below = r.top < innerHeight / 2;
     const tappable = t.matches("button, [data-act], a"); const tapHint = tappable ? `<p class="small" style="color:var(--accent-ink);background:var(--accent);display:inline-block;padding:3px 10px;border-radius:999px;font-weight:700">${KO() && UI() !== "en" ? "눌러서 직접 가 보기 →" : "Tap it to try →"}</p>` : "";
     ov.innerHTML = `<div class="tour-hole" style="left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px"></div>
@@ -1769,7 +1774,7 @@ function drawTour() {
 document.addEventListener("click", ev => { if (TI < 0 || !document.querySelector(".tour")) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel);
   if (ev.target.closest(".tour-card") || (t && t.contains(ev.target))) return; ev.preventDefault(); ev.stopImmediatePropagation(); }, true);
 // keep the spotlight on its target if the page moves under it (iOS address bar, late layout)
-["scroll", "resize"].forEach(ev => window.addEventListener(ev, () => { if (TI < 0) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel); const h = document.querySelector(".tour-hole"); if (!t || !h) return; const r = t.getBoundingClientRect(); h.style.left = (r.left - 8) + "px"; h.style.top = (r.top - 8) + "px"; h.style.width = (r.width + 16) + "px"; h.style.height = (r.height + 16) + "px"; }, { passive: true }));
+["scroll", "resize"].forEach(ev => window.addEventListener(ev, () => { if (TI < 0) return; const st = TSTEPS[TI]; const t = st && document.querySelector(st.sel); const h = document.querySelector(".tour-hole"); if (!t || !h) return; const r = viewRect(t); h.style.left = (r.left - 8) + "px"; h.style.top = (r.top - 8) + "px"; h.style.width = (r.width + 16) + "px"; h.style.height = (r.height + 16) + "px"; }, { passive: true }));
 function tourEnd() { TI = -1; document.querySelectorAll(".tour").forEach(x => x.remove());
   if (TKEY === "main") { if (!ST.tourDone) { ST.tourDone = today(); saveST(); } scrollTop0(); }
   else { ST.seenTours = Object.assign({}, ST.seenTours, { [TKEY]: today() }); saveST(); }
@@ -2440,7 +2445,7 @@ function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInte
   return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
 
 /* ---------- "new version" popup ---------- */
-const APP_VER = "501bf4150a"; let VER_SNOOZE = 0;
+const APP_VER = "09e598eb92"; let VER_SNOOZE = 0;
 async function checkVersion() {
   if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
   try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
@@ -2746,17 +2751,21 @@ function courseNewIds(st, words, force) {
     if (ids.length) { c.unit = u; c.builtFor = weekKey(); c.builtUnit = u; delete c.done; return ids; } }
   c.unit = info.n; c.done = true; c.builtFor = weekKey(); c.builtUnit = info.n; return [];
 }
+/* starting a workbook in the middle: earlier units come back as review words */
+function seedCourseReview(c) { if (!c || c.type !== "wb" || (c.unit || 1) <= 1) return; const info = courseInfo(c); if (!info) return; const prev = [];
+  for (let u = c.unit - 1; u >= 1; u--) (info.units[u - 1] || []).forEach(id => { if (BY[id] && !(WORDS[id] && WORDS[id].box >= MASTER_BOX)) prev.push(id); });
+  const set = new Set(prev); ST.reviewPool = prev.concat((ST.reviewPool || []).filter(id => !set.has(id))); }
 function setCourse(c, by) {
   ST.course = c ? Object.assign({ unit: 1 }, c, { by: by || "me", at: Date.now() }) : null;
   if (!c) delete ST.course;
-  applyCourse();
+  applyCourse(); seedCourseReview(ST.course);
   if (readyForWeeks()) { buildWeek(ST, WORDS, effCfg(ST), true); if (ST.week) { ST.week.unit = ST.course ? ST.course.unit : null; delete ST.week.day; } loadPacksFor(weekIds()); }
   saveST(); PROG = null;
 }
 /* the teacher changed this student's course: rebuild the week once on the student's phone */
 function courseOnLoad() {
   applyCourse();
-  if (ST.courseForce && readyForWeeks()) { delete ST.courseForce; buildWeek(ST, WORDS, effCfg(ST), true); if (ST.week) { ST.week.unit = ST.course ? ST.course.unit : null; delete ST.week.day; } saveST(); }
+  if (ST.courseForce && readyForWeeks()) { delete ST.courseForce; seedCourseReview(ST.course); buildWeek(ST, WORDS, effCfg(ST), true); if (ST.week) { ST.week.unit = ST.course ? ST.course.unit : null; delete ST.week.day; } saveST(); }
 }
 
 /* ---------- course picker ---------- */
@@ -2778,7 +2787,7 @@ function renderCoursePick() {
     body = `<h1 style="margin:4px 0 0">${esc(info.title)}</h1><p class="muted">${TL("유닛을 골라 줘. 일주일에 한 유닛씩 배워요.", "Pick a unit. You learn one unit a week.")}</p>
       <div style="display:grid;grid-template-columns:repeat(${CP.level ? 6 : 1},minmax(0,1fr));gap:8px">${info.units.map((u, i) => `<button class="opt ${sel === i + 1 ? "sel" : ""}" data-act="cpUnit" data-u="${i + 1}" style="min-height:48px;${CP.level ? "padding:0" : ""}${sel === i + 1 ? `;border-color:${info.color};background:${info.color};color:#fff` : ""}">${CP.level ? i + 1 : esc(info.unitName(i))}${cur === i + 1 ? " •" : ""}</button>`).join("")}</div>
       <div class="card" style="gap:8px"><b>${esc(info.unitName(sel - 1))} · ${ids.length} ${TL("단어", "words")}</b><div class="chips">${ids.map(id => BY[id] ? `<span class="chip">${esc(BY[id].w)}</span>` : "").join("")}</div></div>
-      <button class="big primary" data-act="cpGo">${TL("이 유닛으로 시작", "Start this unit")}</button>${CP.level ? `<p class="muted small">${TL("이 코스의 뜻풀이와 예문은 Vocaboo가 직접 만들었어요. 출판사와는 관계가 없어요.", "Meanings and sentences are written by Vocaboo. Not affiliated with the publisher.")}</p>` : ""}`;
+      ${CP.level && sel > 1 ? `<p class="muted small" style="margin:0">${TL(`Unit 1–${sel - 1} 단어는 복습으로 조금씩 나와요.`, `Words from Units 1–${sel - 1} come back as review.`)}</p>` : ""}<button class="big primary" data-act="cpGo">${TL("이 유닛으로 시작", "Start this unit")}</button>${CP.level ? `<p class="muted small">${TL("이 코스의 뜻풀이와 예문은 Vocaboo가 직접 만들었어요. 출판사와는 관계가 없어요.", "Meanings and sentences are written by Vocaboo. Not affiliated with the publisher.")}</p>` : ""}`;
   } else {
     const b = CX.books[0];
     body = `<h1 style="margin:4px 0 0">${TL("어떤 단어를 배울까?", "What do you want to learn?")}</h1>
@@ -2801,7 +2810,7 @@ async function courseAct(a, b) {
     const cur = ST.course && (ST.course.level || ST.course.pack) === (c.level || c.pack) ? ST.course.unit : 0; c.unit = CP.unit || cur || 1;
     setCourse(c); try { sfx("win"); } catch (e) {} toast(TL(`${info.short} ${info.unitName(c.unit - 1)} 시작!`, `Starting ${info.short} ${info.unitName(c.unit - 1)}!`)); view = { name: studentHome() }; TAB = "today"; scrollTop0(); render(); return true; }
   if (a === "suCourse") { ST._suCourse = b.dataset.v; OB_DIR = 0; render(); return true; }
-  if (a === "suLevel") { ST._suLevel = b.dataset.v; OB_DIR = 0; render(); return true; }
+  if (a === "suLevel") { if (ST._suLevel !== b.dataset.v) delete ST._suUnit; ST._suLevel = b.dataset.v; OB_DIR = 0; render(); return true; }
   if (a === "tw") { twShow(b); return true; }
   if (a === "tiAdd" || a === "tiDel") { tileTap(a, +b.dataset.i); return true; }
   if (a === "tiCheck") { tileCheck(); return true; }
@@ -2817,13 +2826,13 @@ function suCourseStep() {
   const adult = !!(ST.profile && ST.profile.adult); const v = ST._suCourse || (ST.course ? (ST.course.type === "wb" ? "wb" : "th") : (adult ? "" : "grade"));
   const opt = (k, t, s) => `<button class="goal" data-act="suCourse" data-v="${k}" aria-pressed="${v === k}" style="min-height:70px"><span style="flex:1;text-align:left"><b>${t}</b><br><span class="muted small">${s}</span></span><span class="ck"></span></button>`;
   let more = "";
-  if (v === "wb") { const b = CX.books[0]; more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${b.levels.map(L => `<button class="opt ${ST._suLevel === L.id ? "sel" : ""}" data-act="suLevel" data-v="${L.id}" style="min-height:52px;${ST._suLevel === L.id ? `background:${L.color};color:#fff;border-color:${L.color}` : `border-left:8px solid ${L.color}`}">${L.name}</button>`).join("")}</div><p class="muted small">${TL("Unit 1부터 시작해요. 유닛은 나중에 Me → 내 코스에서 바꿀 수 있어요.", "You start at Unit 1. Change units later in Me → My course.")}</p>`; }
+  if (v === "wb") { const b = CX.books[0]; more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${b.levels.map(L => `<button class="opt ${ST._suLevel === L.id ? "sel" : ""}" data-act="suLevel" data-v="${L.id}" style="min-height:52px;${ST._suLevel === L.id ? `background:${L.color};color:#fff;border-color:${L.color}` : `border-left:8px solid ${L.color}`}">${L.name}</button>`).join("")}</div>${ST._suLevel ? (() => { const L = b.levels.find(x => x.id === ST._suLevel); const u = ST._suUnit || 1; return `<div class="field" style="width:100%;margin-top:4px"><label for="suUnit">${TL("어느 유닛부터 시작할까?", "Which unit do you start with?")}</label><select id="suUnit" data-change="suUnit" style="min-height:52px;border-radius:14px;border:2px solid var(--line);padding:0 10px;font:inherit;font-size:17px;background:#fff;width:100%">${L.units.map((x, i) => `<option value="${i + 1}" ${u === i + 1 ? "selected" : ""}>Unit ${i + 1}</option>`).join("")}</select></div><p class="muted small">${u > 1 ? TL(`Unit 1–${u - 1} 단어는 복습으로 조금씩 나와요.`, `Words from Units 1–${u - 1} come back as review.`) : TL("나중에 Me → 내 코스에서 바꿀 수 있어요.", "You can change it later in Me → My course.")}</p>`; })() : ""}`; }
   if (v === "th") more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${CX.themes.map(p => `<button class="opt ${ST._suLevel === p.id ? "sel" : ""}" data-act="suLevel" data-v="${p.id}" style="min-height:52px;${ST._suLevel === p.id ? `background:${TH_COLOR[p.id]};color:#fff;border-color:${TH_COLOR[p.id]}` : `border-left:8px solid ${TH_COLOR[p.id]}`}">${TL(p.ko, p.name)}</button>`).join("")}</div>`;
   return { mood: "think", q: TL("어떤 단어를<br>배울까?", "What do you want<br>to learn?"), sub: UI() === "en" ? "" : "What do you want to learn?",
     body: `<div class="goals">${opt("grade", TL("내 수준에 맞게", "Words for my level"), TL("방금 본 레벨 테스트에 맞춰 골라 줘요", "Picked from the level test you just took"))}${wbVisible() ? opt("wb", TL("워크북 코스", "Workbook course"), "Vocabulary Workshop · Red · Purple · Green · Orange") : ""}${opt("th", TL("테마 팩", "Theme packs"), TL("여행 · 비즈니스 · 주방 · 쇼핑 · 건강 · 감정", "Travel · Business · Kitchen · Shopping · Health · Feelings"))}</div>${more}`,
     ok: () => v === "grade" || ((v === "wb" || v === "th") && !!ST._suLevel && (v === "wb" ? CX.books[0].levels.some(L => L.id === ST._suLevel) : CX.themes.some(p => p.id === ST._suLevel))),
-    commit: () => { if (v === "grade") { if (ST.course) setCourse(null); } else { const c = v === "wb" ? { type: "wb", book: "vw", level: ST._suLevel, unit: 1 } : { type: "th", pack: ST._suLevel, unit: 1 };
-      if (!ST.course || (ST.course.level || ST.course.pack) !== ST._suLevel) setCourse(c); } delete ST._suCourse; delete ST._suLevel; } };
+    commit: () => { if (v === "grade") { if (ST.course) setCourse(null); } else { const c = v === "wb" ? { type: "wb", book: "vw", level: ST._suLevel, unit: ST._suUnit || 1 } : { type: "th", pack: ST._suLevel, unit: 1 };
+      if (!ST.course || (ST.course.level || ST.course.pack) !== ST._suLevel || (c.unit || 1) !== (ST.course.unit || 1)) setCourse(c); } delete ST._suCourse; delete ST._suLevel; delete ST._suUnit; } };
 }
 
 /* ---------- tap a word in a sentence to see its meaning ---------- */
@@ -2838,7 +2847,7 @@ function tapSent(s, target, markTarget) { const tid = target ? idOf(target) : nu
     return `<span class="tw" data-act="tw" data-id="${id}">${esc(tok)}</span>`; }).join(""); }
 function twShow(el) { document.querySelectorAll(".tw-tip").forEach(x => x.remove()); const e = BY[el.dataset.id]; if (!e) return;
   const tip = document.createElement("div"); tip.className = "tw-tip"; tip.textContent = KO() ? e.senses[0].ko : e.senses[0].def;
-  document.body.appendChild(tip); const r = el.getBoundingClientRect(); const w = tip.offsetWidth;
+  document.body.appendChild(tip); const r = viewRect(el); const w = tip.offsetWidth;
   tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px"; tip.style.top = (r.bottom + 8) + "px";
   setTimeout(() => tip.remove(), 2200); }
 document.addEventListener("scroll", () => document.querySelectorAll(".tw-tip").forEach(x => x.remove()), true);
@@ -3524,6 +3533,7 @@ document.addEventListener("change", async ev => {
   if (ev.target.dataset.change === "obDobSel") { stashOnboard(); const g = id => +(document.getElementById(id) || {}).value || 0; const y = g("obY"), m = g("obM"); let d = g("obD");
     if (y && m && d > new Date(y, m, 0).getDate()) d = new Date(y, m, 0).getDate(); ST._dobP = [y, m, d];
     ST._dob = y && m && d ? y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0") : ""; OB_DIR = 0; render(); return mascotWrite(); }
+  if (ev.target.dataset.change === "suUnit") { ST._suUnit = +ev.target.value; OB_DIR = 0; return render(); }
   if (ev.target.dataset.change === "obReady") return obReady(true);
   if (ev.target.dataset.change === "tSort") { T.sort = ev.target.value; return render(); }
   if (ev.target.dataset.change === "voice") { MYV = VOICES.find(v => v.name === ev.target.value) || MYV; try { localStorage.setItem("ww_voice", MYV.name); } catch (e) {} say("Hello! This is how your words will sound."); } });
