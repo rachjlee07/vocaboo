@@ -95,7 +95,9 @@ function buildWeek(st, words, cfg, force) {
   if (prev) prev.newIds.forEach(i => used.add(i));
   const newIds = [];
   const tbN = cfg.tbNew != null ? cfg.tbNew : cfg.newPerWeek;
-  if (cfg.textbook !== false) for (const e of QUEUE) { if (newIds.length >= tbN) break; if (e.cu < cfg.startUnit || used.has(e.id)) continue; newIds.push(e.id); }
+  const cw = cfg.course && typeof courseNewIds === "function" ? courseNewIds(st, words, force) : null; if (cw) cw.forEach(id => newIds.push(id));
+  if (cw && !cw.length && cfg.grNewFallback) gradedPick(st, words, new Set([...used, ...newIds]), cfg.grNewFallback).forEach(id => newIds.push(id));
+  if (!cw && cfg.textbook !== false) for (const e of QUEUE) { if (newIds.length >= tbN) break; if (e.cu < cfg.startUnit || used.has(e.id)) continue; newIds.push(e.id); }
   if (cfg.grNew && typeof gradedPick === "function") gradedPick(st, words, new Set([...used, ...newIds]), cfg.grNew).forEach(id => newIds.push(id));
   const rev = []; const take = id => { if (!rev.includes(id) && !newIds.includes(id) && BY[id]) rev.push(id); };
   // 1) words still weak from last week, 2) placement misses, 3) weakest learned words, 4) earlier units
@@ -106,7 +108,7 @@ function buildWeek(st, words, cfg, force) {
   if (rev.length < cfg.reviewPerWeek && st.level && typeof GRADED !== "undefined") { const L = st.level.g; const known = new Set(st.level.known || []);
     shuffle(GRADED.filter(e => !e.soft && e.g >= L - 1.5 && e.g < L - 0.3 && !words[e.id] && !known.has(e.id))).forEach(e => rev.length < cfg.reviewPerWeek && take(e.id)); }
   if (prev) { st.history = (st.history || []).concat([{ key: prev.key, newIds: prev.newIds, reviewIds: prev.reviewIds, learned: prev.introDone ? prev.newIds.length : (prev.trained || []).length }]).slice(-40); }
-  st.week = { key, newIds, reviewIds: rev, introDone: false, trained: [], created: Date.now() };
+  st.week = { key, newIds, reviewIds: rev, introDone: false, trained: [], created: Date.now() }; if (cw) st.week.unit = st.course.unit;
   if (st._hard) { st.week.hard = st._hard; delete st._hard; }
   return true;
 }
@@ -214,30 +216,32 @@ const AUDIO_BASE = window.__audioBase || "audio/"; // beta copies point at the m
 
 /* ---------- recorded audio ---------- */
 const PACKS = {}, PACK_LOADING = {};
-const packOf = id => BY[id] ? BY[id].src[0] : null;
+const packOf = id => BY[id] ? (BY[id].ovPack || BY[id].src[0]) : null;
+const packsOf = id => { const e = BY[id]; if (!e) return []; return e.ovPack ? [e.ovPack, e.src[0]] : [e.src[0]]; };
 function loadPack(name) {
   if (!name) return Promise.resolve();
   if (PACKS[name]) return Promise.resolve(PACKS[name]);
   if (!PACK_LOADING[name]) PACK_LOADING[name] = fetch(AUDIO_BASE + name + ".json").then(r => r.ok ? r.json() : {}).catch(() => ({})).then(j => (PACKS[name] = j));
   return PACK_LOADING[name];
 }
-const loadPacksFor = ids => Promise.all([...new Set(ids.map(packOf))].map(loadPack));
+const loadPacksFor = ids => Promise.all([...new Set(ids.flatMap(packsOf))].map(loadPack));
 const player = new Audio(); player.preload = "auto";
 let unlocked = false;
 document.addEventListener("pointerdown", () => { if (unlocked) return; unlocked = true;
   try { player.src = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//OEwAAAAAAAAAAAAEluZm8AAAAPAAAABQAAAqAAbW1tbW1tbW1tbW1tbW1tbW1tbZKSkpKSkpKSkpKSkpKSkpKSkpKStra2tra2tra2tra2tra2tra2trbb29vb29vb29vb29vb29vb29vb2///////////////////////////AAAAAExhdmM2MC4zMQAAAAAAAAAAAAAAACQEUAAAAAAAAAKgvT9A1gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//NExAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExFMAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKYAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"; player.play().catch(() => {}); } catch (e) {} }, { capture: true });
-function clipFor(id, tag) { let p = PACKS[packOf(id)]; if (!(p && p[id] && p[id][tag]) && PACKS.TEST && PACKS.TEST[id]) p = PACKS.TEST; return p && p[id] && p[id][tag] ? "data:audio/mpeg;base64," + p[id][tag] : null; }
+function clipFor(id, tag) { const ps = packsOf(id); for (let k = 0; k < ps.length; k++) { if (k > 0 && tag !== "w") break; const q = PACKS[ps[k]]; if (q && q[id] && q[id][tag]) return "data:audio/mpeg;base64," + q[id][tag]; }
+  let p = PACKS[packOf(id)]; if (!(p && p[id] && p[id][tag]) && PACKS.TEST && PACKS.TEST[id]) p = PACKS.TEST; return p && p[id] && p[id][tag] ? "data:audio/mpeg;base64," + p[id][tag] : null; }
 let speakTok = 0;
 function playSrc(src, rate, fallback) { try { player.pause(); player.src = src; player.playbackRate = rate || 1; try { player.preservesPitch = true; player.webkitPreservesPitch = true; } catch (x) {} const p = player.play(); if (p) p.catch(fallback); return true; } catch (err) { return false; } }
 async function speak(id, tag) {
   const e = BY[id]; if (!e) return; const my = ++speakTok;
-  const text = tag === "w" || tag === "s" || tag[0] === "y" ? e.w : e.ex[+tag.slice(1)];
+  const text = tag === "t" ? (e.cx && e.cx.tr ? e.cx.tr.en : e.w) : tag === "w" || tag === "s" || tag[0] === "y" ? e.w : (e.ex[+tag.slice(1)] || e.w);
   if ("speechSynthesis" in window) speechSynthesis.cancel();
   const pick = () => { if (tag === "s") { const w = clipFor(id, "w"); return w ? [w, 0.7] : null; } // slow = the recorded word, slowed down
     const c = clipFor(id, tag); if (c) return [c, 1]; if (tag[0] === "y") { const w = clipFor(id, "w"); return w ? [w, 0.7] : null; } return null; };
   let got = pick();
   if (!got && view.name !== "level") { // recording may still be downloading: wait for it briefly
-    await Promise.race([loadPack(packOf(id)), new Promise(r => setTimeout(r, 3500))]); if (my !== speakTok) return; got = pick(); }
+    await Promise.race([loadPacksFor([id]), new Promise(r => setTimeout(r, 3500))]); if (my !== speakTok) return; got = pick(); }
   const rate = tag === "s" || tag[0] === "y" ? 0.55 : 0.9;
   if (got && playSrc(got[0], got[1], () => say(text, rate))) return;
   say(text, rate);
@@ -418,7 +422,7 @@ function setShell(kind) { // kind: tabs | focus | teacher | bare
   const t = (k, l, ic) => `<button data-act="tabgo" data-tab="${k}" ${TAB === k ? 'aria-current="page"' : ""}>${ic}<span>${l}</span></button>`;
   tabs.innerHTML = `<div class="tabbar"><nav>${t("today", "Today", I.home)}${t("map", "Map", I.map)}${t("words", "Words", I.cards)}${t("progress", "Progress", I.chart)}${t("me", "Me", I.me)}</nav></div>`;
 }
-function previewBar() { return IS_OWNER ? `<div class="notice info row between" style="margin-top:12px"><span>Student preview (test data)</span><button class="ghost" data-act="toTeacher">Dashboard</button></div>` : ""; }
+function previewBar() { return IS_OWNER ? `<div class="notice info row between" style="margin-top:12px"><span>Preview (test)</span><span class="row" style="gap:6px"><button class="ghost" data-act="previewRestartAsk">↺ Start over</button><button class="ghost" data-act="toTeacher">Dashboard</button></span></div>` : ""; }
 function scrollTop0() { try { window.scrollTo(0, 0); } catch (e) {} try { $app.scrollTo(0, 0); } catch (e) {} }
 function render() { renderInner(); drawGear(); fitWords(); try { mascotSync(); } catch (e) {} }
 function fitWords() { document.querySelectorAll("#app .word").forEach(el => { el.style.whiteSpace = "nowrap"; let fs = parseFloat(getComputedStyle(el).fontSize) || 46; let n = 0;
@@ -446,6 +450,7 @@ function renderInner() {
   if (v === "setup") { setShell("bare"); return renderSetup(); }
   if (v === "spacedResult") { setShell("focus"); return renderSpacedResult(); }
   if (v === "run") { setShell("focus"); return renderRun(); }
+  if (v === "coursePick") { setShell("focus"); return renderCoursePick(); }
   if (v === "train") { setShell("focus"); return renderTrain(); }
   if (v === "result") { setShell("focus"); return renderResult(); }
   if (v === "trainDone") { setShell("focus"); return renderTrainDone(); }
@@ -502,7 +507,9 @@ function renderToday() {
   $app.innerHTML = `${previewBar()}<div class="row between" style="padding-top:14px"><span class="eyebrow">${dayLabel}${wk ? " · " + wk.newIds.length + " WORDS THIS WEEK" : ""}</span><span class="pill" style="font-family:var(--f-mono)">${I.flame.replace("<svg", '<svg width="14" height="14" style="color:#FF7A45"')} ${s}</span></div>
     <div class="ob-ask" style="align-items:flex-end">${bubbo(say.mood, 64)}<div class="bub" style="flex:1"><div class="eyebrow" style="font-size:11px;margin-bottom:2px">BUBBO</div>${say.t}</div></div>
     ${inappBanner()}${installBanner()}
+    ${ST.course ? `<button class="course-pill" data-act="coursePick" style="--cc:${(courseInfo(ST.course) || {}).color || "#16141D"}"><i></i>${esc(courseLabel(ST.course))}<span>›</span></button>` : ""}
     ${learnCard}
+    ${pledgeCard()}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${coachTile}${quizTile}${storyTile}${bonusTile}</div>
     ${lastVoiceCard()}
     ${spacedCard()}
@@ -591,6 +598,7 @@ function renderProgress() {
 function renderMe() {
   const email = (WW.user() && WW.user().email) || "";
   $app.innerHTML = `${previewBar()}<div class="stack" style="padding-top:18px;align-items:center;text-align:center">${bubbo("happy", 96)}<h1>${esc(firstName() || email.split("@")[0] || "Me")}</h1><p class="muted">${esc(email)}</p>${ST.level ? `<button class="pill grade-tap" data-act="showGrade" style="font-size:15px;padding:6px 14px">📈 ${esc(gradeWord(ST.level.g))} · see details ›</button>` : ""}</div>
+   ${courseCard()}
    <div class="card" style="gap:8px"><div class="row between"><h3>${TL("언어 · Language", "Language")}</h3></div><div class="seg" style="width:100%"><button data-act="setUi" data-v="ko" aria-pressed="${UI() !== "en"}" style="flex:1">한국어</button><button data-act="setUi" data-v="en" aria-pressed="${UI() === "en"}" style="flex:1">English</button></div></div>
    <div class="card" style="gap:8px"><div class="row between"><h3>${TL("단어 뜻 · Meanings", "Meanings")}</h3></div><div class="seg" style="width:100%"><button data-act="setLang" data-v="ko" aria-pressed="${KO()}" style="flex:1">${TL("영어 + 한국어", "English + Korean")}</button><button data-act="setLang" data-v="en" aria-pressed="${!KO()}" style="flex:1">English only</button></div></div>
    <div class="card"><h3>This week's goal</h3>${goalHtml()}</div>
@@ -626,8 +634,9 @@ async function startRun(kind) {
   if (kind === "quiz") { await loadPacksFor(qs.map(q => q.id)); }
   RUN && (RUN.t0 = Date.now()); autoSpeak();
 }
-function autoSpeak() { const q = RUN && RUN.qs[RUN.i]; if (q && (q.t === "dict" || q.t === "hear_ko")) speak(q.id, "w"); }
+function autoSpeak() { const q = RUN && RUN.qs[RUN.i]; if (q && (q.t === "dict" || q.t === "hear_ko")) speak(q.id, "w"); if (q && q.t === "lis_build") speak(q.id, q.tag); }
 function qPrompt(q) {
+  if (CX_T.has(q.t)) return cxPrompt(q);
   const e = BY[q.id]; const hint = (RUN && RUN.kind === "quiz" ? hintsToday() : RUN && RUN.kind === "testout" ? false : CFG.hints) ? `<p class="hint">${esc(e.w[0])}${" _".repeat(Math.max(0, e.w.length - 1))}</p>` : "";
   const kos = `<div class="stack" style="gap:6px">${e.senses.map(x => `<div class="sense"><span class="pos-tag">${esc(x.pos)}</span><p class="q-prompt">${esc(sgloss(x))}</p></div>`).join("")}</div>`;
   if (q.t === "mc_ko") return `<p class="label">What does this word mean?</p><div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div>${spk(e.id, "w")}</div>`;
@@ -635,7 +644,7 @@ function qPrompt(q) {
   if (q.t === "ko_en") return `<p class="label">Type the English word</p>${kos}${hint}`;
   if (q.t === "def_en") return `<p class="label">Type the word for this meaning</p><div class="sense"><span class="pos-tag">${esc(e.pos)}</span><p class="q-prompt">${esc(e.def)}</p></div>${hint}`;
   if (q.t === "hear_ko") return `<p class="label">Listen. What does it mean?</p><div class="row" style="flex-wrap:nowrap">${spk(e.id, "w", "Play word", "big primary icon-l")}${spk(e.id, "s", "Slow", "icon-l")}</div>`;
-  if (q.t === "ctx_ko") return `<p class="label">What does the underlined word mean here?</p><div class="ex">${spk(e.id, "e0")}<p style="font-size:20px;font-weight:700">${exHtml(e.ex[0], e.w)}</p></div>`;
+  if (q.t === "ctx_ko") return `<p class="label">What does the underlined word mean here?</p><div class="ex">${spk(e.id, "e0")}<p style="font-size:20px;font-weight:700">${tapSent(e.ex[0], e.w, true)}</p></div>`;
   if (q.t === "en_ko") return `<p class="label">Type the Korean meaning (one meaning is enough)</p><div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div>${spk(e.id, "w")}</div>`;
   if (q.t === "say_en") return `<p class="label">Say the English word out loud</p>${kos}`;
   if (q.t === "match") return matchHtml(q);
@@ -650,6 +659,7 @@ function renderRun() {
   let body = "";
   if (q.t === "match") body = "";
   else if (q.t === "say_en") body = runSayHtml(q, e);
+  else if (TILE_T.has(q.t)) body = tileBody(q);
   else if (typed) body = `<form class="stack" data-form="answer"><input class="answer" id="ans" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" ${RUN.answered ? "disabled" : ""} value="${esc(RUN.lastAns || "")}" aria-label="Your answer" placeholder="${q.t === "en_ko" ? TL("한국어로 쓰세요", "Type it in Korean") : "Type here"}" ${q.t === "en_ko" ? 'lang="ko"' : ""}>
      ${RUN.answered ? "" : `<button class="big primary" type="submit">Check</button><button type="button" class="ghost" data-act="idk" style="align-self:center">I don't know</button>`}</form>`;
   else body = `<div class="opts">${q.opts.map(o => { let c = ""; const bw = q.t === "blank_mc" && (RUN.bWrong || []).includes(o.id); if (RUN.answered) { if (o.id === q.id) c = "right"; else if (o.id === RUN.picked) c = "wrong"; } else if (bw) c = "wrong";
@@ -660,13 +670,15 @@ function renderRun() {
   if (RUN.answered && RUN.kind !== "placement" && q.t === "match") fb = `<div class="fb ${RUN.ok ? "good" : "bad"}">${RUN.ok ? "Perfect matching!" : "All matched. Some took more than one try."}</div>` + nextBtn;
   else if (RUN.answered && RUN.kind !== "placement" && q.t === "say_en") fb = (RUN.ok || RUN.fixed || (RUN.fixTries || 0) >= 3) ? nextBtn : "";
   else if (RUN.answered && RUN.kind === "quiz" && (q.t === "blank_mc" || q.t === "blank_ty")) fb = blankExplain(e) + nextBtn;
+  else if (RUN.answered && TILE_T.has(q.t)) fb = tileFb(q) + nextBtn;
+  else if (RUN.answered && CX_T.has(q.t)) fb = cxFb(q) + nextBtn;
   else if (RUN.answered && RUN.kind !== "placement") {
     fb = RUN.ok ? `<div class="fb good">Correct! <span class="mono">${esc(e.w)}</span> = ${esc(gloss(e))}</div>`
       : `<div class="fb bad stack" style="gap:6px"><span>The answer is <b class="mono">${esc(e.w)}</b> (${esc(gloss(e))})</span>${enTyped && RUN.lastAns ? `<span class="diff">${diffHtml(RUN.lastAns, e.w)}</span>` : ""}</div>`;
     if (enTyped && !RUN.ok && !RUN.fixed) fb += fixForm(e, "fixQuiz");
     else fb += `${enTyped && !RUN.ok ? `<div class="fb good">Good. Now you've spelled it right.</div>` : ""}` + nextBtn;
   }
-  $app.innerHTML = `${topbar(RUN.i, RUN.qs.length)}<span class="eyebrow">${RUN.kind === "placement" ? "Word check" : RUN.kind === "testout" ? "Test-out quiz · need 80%" : RUN.kind === "boss" ? "👑 Boss review · need 80%" : RUN.kind === "skipcheck" ? "Quick check · do you know it?" : RUN.kind === "spaced" ? "🧠 Remember these?" : "Daily quiz"}</span><div class="card">${qPrompt(q)}${body}${fb}</div>`;
+  $app.innerHTML = `${topbar(RUN.i, RUN.qs.length)}<div class="row between" style="align-items:center;flex-wrap:nowrap"><span class="eyebrow">${RUN.kind === "placement" ? "Word check" : RUN.kind === "testout" ? "Test-out quiz · need 80%" : RUN.kind === "boss" ? "👑 Boss review · need 80%" : RUN.kind === "skipcheck" ? "Quick check · do you know it?" : RUN.kind === "spaced" ? "🧠 Remember these?" : "Daily quiz"}</span>${comboTag()}</div><div class="card">${prevTag(q)}${qPrompt(q)}${body}${fb}</div>`;
   const inp = document.getElementById("ans"); if (inp && !RUN.answered) inp.focus();
   const fx = document.getElementById("fix"); if (fx) fx.focus();
 }
@@ -693,18 +705,18 @@ function answer(ans, picked) {
   else ok = norm(ans) === norm(e.w);
   if ((q.t === "blank_mc" || q.t === "blank_ty") && RUN.kind === "quiz") { // keep trying until right; only the first try counts
     if (!ok) { if (!RUN.bTries) record(q.id, q.t, false, ans, ms); RUN.bTries = (RUN.bTries || 0) + 1; RUN.bWrong = (RUN.bWrong || []).concat([picked || ans]); RUN.lastAns = q.t === "blank_ty" ? "" : ans; return render(); }
-    const first = !RUN.bTries; RUN.ok = first; RUN.answered = true; RUN.lastAns = ans;
+    const first = !RUN.bTries; RUN.ok = first; RUN.answered = true; RUN.lastAns = ans; RUN.combo = first ? (RUN.combo || 0) + 1 : 0;
     if (first) { RUN.right++; award(10, "answer"); record(q.id, q.t, true, ans, ms); sfx("good"); } else { award(2, "fixed"); sfx("pop"); }
     speak(e.id, "w"); return render();
   }
-  RUN.ok = ok; RUN.answered = true; RUN.lastAns = ans; if (ok) { RUN.right++; award(10, "answer"); sfx("good"); } else sfx("bad");
+  RUN.ok = ok; RUN.answered = true; RUN.lastAns = ans; RUN.combo = ok ? (RUN.combo || 0) + 1 : 0; if (ok) { RUN.right++; award(10, "answer"); sfx("good"); } else sfx("bad");
   record(q.id, q.t, ok, ans, ms);
   if (RUN.kind === "placement") { setTimeout(next, 120); return; }
   if (!ok) speak(e.id, "w");
   render();
 }
 function next() {
-  RUN.i++; RUN.bTries = 0; RUN.bWrong = []; RUN.answered = false; RUN.fixed = false; RUN.heard = ""; RUN.micErr = ""; RUN.fixTries = 0; RUN.listening = false; RUN.lastAns = ""; RUN.picked = null; RUN.t0 = Date.now();
+  RUN.i++; RUN.built = []; RUN.bTries = 0; RUN.bWrong = []; RUN.answered = false; RUN.fixed = false; RUN.heard = ""; RUN.micErr = ""; RUN.fixTries = 0; RUN.listening = false; RUN.lastAns = ""; RUN.picked = null; RUN.t0 = Date.now();
   if (RUN.i >= RUN.qs.length) return finishRun();
   render(); autoSpeak();
 }
@@ -742,6 +754,7 @@ function renderResult() {
   const pass = pct >= CFG.passPct;
   $app.innerHTML = `<div style="height:14px"></div><div class="result-hero ${pass ? "" : "bad"}">${buddy(pass ? "wow" : "sad", 96)}${ring(pct, pass ? "#FFC93C" : "#fff", 150, `<text x="50%" y="56%" text-anchor="middle" font-size="34" font-weight="900" fill="#fff" font-family="Nunito, Noto Sans KR, sans-serif">${pct}%</text>`)}
     <h1>${pass ? "Great job!" : "Almost there"}</h1><p style="opacity:.9">${v.right} of ${v.n} correct · <b>${streakNow()}-day streak</b> ${I.flame.replace("<svg", '<svg width="16" height="16" style="vertical-align:-2px;color:#FFC93C"')}</p></div>
+  ${pass ? pledgeAsk() : ""}
   ${pass ? "" : `<div class="notice bad">Under ${CFG.passPct}%. Train the ${v.wrongIds.length} missed words to unlock the next quiz.</div>`}
   ${v.wrongIds.length ? `<div class="card"><h3>Missed words</h3><div class="chips">${v.wrongIds.map(id => `<span class="chip">${esc(BY[id].w)} · ${esc(gloss(BY[id]))}</span>`).join("")}</div></div>` : ""}
   ${pass && ST.coachDay !== today() ? `<button class="big primary" data-act="coach">Next: Sentence coach</button><button class="big" data-act="home">Later</button>` : `<button class="big primary" data-act="${pass ? "home" : "train"}">${pass ? "Done" : "Start training"}</button>`}`;
@@ -1045,7 +1058,7 @@ function buildQuiz2() {
   const plan = []; for (let i = 0; i < half; i++) plan.push(enko[i % enko.length]); for (let i = 0; i < n - half; i++) plan.push(koen[i % koen.length]);
   if (n >= 10 && wk.length >= 4) plan[0] = "match";
   const types = shuffle(plan).map((p, i) => p === "def_or_ko" ? (stageOf(ids[i]) === 1 ? "ko_en" : "def_en") : p === "blank" ? (stageOf(ids[i]) === 1 ? "blank_mc" : "blank_ty") : p);
-  return ids.map((id, i) => makeQ2(id, types[i], wk.concat(due)));
+  return cxMix(ids.map((id, i) => makeQ2(id, types[i], wk.concat(due))), wk.concat(due));
 }
 
 /* quiz speaking (one word) */
@@ -1221,14 +1234,16 @@ function flRate(r) { const id = FL.queue.shift(); FL.flipped = false;
   render(); flSpeak(); }
 
 /* ---------- account set-up (right after the first level test), one thing per screen ---------- */
-let SU = 0;
+let SU = 0, SU_STEP0 = null;
 function renderSetup() {
-  const s = SET(); const n = (s.textbook ? s.tbNew : 0) + s.grNew; const times = (ST.push && ST.push.times) || [17]; const nm = firstName() || "";
+  const s = SET(); const n = ST.course && courseInfo(ST.course) ? (ST.week ? ST.week.newIds.length : 12) : (s.textbook ? s.tbNew : 0) + s.grNew; const times = (ST.push && ST.push.times) || [17]; const nm = firstName() || "";
   const hour = h => h < 12 ? h + ":00 am" : h === 12 ? "12:00 pm" : (h - 12) + ":00 pm";
   const sel = i => `<select data-change="remTime" data-i="${i}" style="min-height:50px;border-radius:14px;border:2px solid var(--line);padding:0 10px;font:inherit;font-size:17px;background:#fff;width:100%"><option value="">Off</option>${Array.from({ length: 17 }, (_, k) => k + 6).map(h => `<option value="${h}" ${times[i] === h ? "selected" : ""}>${hour(h)}</option>`).join("")}</select>`;
   const canPush = WW.pushPermission() !== "unsupported"; const ios = /iPhone|iPad/.test(navigator.userAgent); const installed = WW.standalone ? WW.standalone() : false;
   const per = Math.max(1, Math.ceil(n / STUDY_DAYS));
-  const steps = [
+  SU_STEP0 = suCourseStep(); const info = courseInfo(ST.course);
+  const steps = [SU_STEP0,
+    info ? { mood: "happy", q: TL("일주일에 한 유닛씩!", "One unit a week!"), sub: UI() === "en" ? "" : "One unit a week!", body: `<p class="muted">${TL(`${esc(info.title)} · ${esc(info.unitName((ST.course.unit || 1) - 1))}부터 시작해요. 유닛마다 단어 ${info.units[0].length}개를 배우고, 다음 주에는 다음 유닛으로 넘어가요.`, `You start at ${esc(info.title)} · ${esc(info.unitName((ST.course.unit || 1) - 1))}. Each unit has ${info.units[0].length} words, and next week you move to the next unit.`)}</p>` } :
     { mood: "happy", q: TL("일주일에 새 단어<br>몇 개 배울까?", "How many new words<br>a week?"), sub: UI() === "en" ? "" : "How many new words a week?", body: s.textbook ? `<p class="muted">Your teacher set your plan: <b>${n}</b> words a week.</p>`
       : `<div class="goals">${[[10, "가볍게 · Easy"], [15, "딱 좋아 · Just right"], [20, "열심히 · Serious"], [30, "빡세게 · Intense"]].map(([v, l]) => `<button class="goal" data-act="suWords" data-v="${v}" aria-pressed="${s.grNew === v}"><b style="font-family:var(--f-display);font-size:22px;width:36px">${v}</b>${TL(l, l.split(" · ")[1])}<span class="ck"></span></button>`).join("")}</div><p class="muted small">${TL("잘 모르겠으면 15! 나중에 For parents에서 바꿀 수 있어요.", "Not sure? Pick 15. You can change it later in For parents.")}</p>` },
     { hero: true, body: `<div class="ob-hero"><div class="mslot hero" data-sc="1.4" data-act="cheer" data-hold="1" data-key="count"></div><div class="big-num" style="animation:introIn .5s .2s both">${n}<small>words</small></div><div class="ob-q" style="animation:introIn .5s .35s both">${TL(`첫 주에 단어 ${n}개!`, `${n} words in your first week!`)}</div><p class="muted" style="animation:introIn .5s .5s both">${TL(`하루 ${per}개씩 5일, 그리고 쉬는 날 2일. ${nm ? nm + ", " : ""}넌 할 수 있어!`, `${per} a day for 5 days, then 2 days off. ${nm ? nm + ", y" : "Y"}ou can do it!`)}</p></div>` },
@@ -1240,7 +1255,7 @@ function renderSetup() {
     .concat([{ hero: true, body: `<div class="ob-hero"><div class="mslot hero" data-sc="1.4" data-act="wave" data-key="done"></div><div class="ob-q" style="animation:introIn .5s .25s both">${TL("준비 완료! 🎉", "All set! 🎉")}</div><p class="muted" style="animation:introIn .5s .4s both">${TL("매일 단어 몇 개, 짧은 퀴즈, 그리고 말하기 연습. 작은 걸음이 모여 큰 실력이 돼요.", "A few words a day, a short quiz, and some speaking. Small steps add up.")}</p></div>` }]);
   SU = Math.max(0, Math.min(steps.length - 1, SU)); const st = steps[SU]; const last = SU === steps.length - 1;
   const body = st.hero ? st.body : obAsk(st.mood, st.q, st.sub) + st.body;
-  $app.innerHTML = obShell({ back: SU ? "suBack" : "", pct: (SU + 1) / steps.length * 100, body, act: last ? "suDone" : "suNext", btn: last ? TL("시작하자! 🚀", "Let's start! 🚀") : TLK("next"), disabled: SU === 0 && !s.textbook && !s.grNew });
+  $app.innerHTML = obShell({ back: SU ? "suBack" : "", pct: (SU + 1) / steps.length * 100, body, act: last ? "suDone" : "suNext", btn: last ? TL("시작하자! 🚀", "Let's start! 🚀") : TLK("next"), disabled: SU === 0 ? !SU_STEP0.ok() : SU === 1 && !info && !s.textbook && !s.grNew });
 }
 function suWords(v) { const s = Object.assign({}, ST.settings || {}); s.grNew = v; ST.settings = s; ST.planBy = { at: Date.now(), who: "setup" };
   const wk = ST.week; if (wk && !(wk.trained || []).length) { buildWeek(ST, WORDS, effCfg(ST), true); delete ST.week.day; loadPacksFor(weekIds()); } // first week not started: use the new number now
@@ -1723,7 +1738,7 @@ const TOUR = [
 let TI = -1, TSTEPS = TOUR, TKEY = "main";
 const SEC_TOURS = {
   train: [[".card .word", "Here is your new word. Tap 🔊 to hear it, or Slow to hear it slowly.", "새 단어예요. 🔊를 눌러 듣고, Slow로 천천히 들어요."], [".sense", "The Korean meaning and an easy English definition.", "한국어 뜻과 쉬운 영어 설명이에요."], [".parts", "Syllables: tap a part to hear it. The dark one is said strongest.", "음절이에요. 눌러서 들어 보세요. 진한 부분을 가장 세게 읽어요."], [".ex", "Example sentences. Tap 🔊 to listen.", "예문이에요. 🔊를 눌러 들어요."], ['[data-act="toSpeak"],[data-act="cover"]', "Next, say it out loud, then write it from memory!", "그다음 소리 내어 말하고, 기억해서 써 봐요!"], [".topbar .bar", "This bar shows how many words you've finished.", "끝낸 단어 수를 보여줘요."]],
-  quiz: [[".topbar .bar", "This bar shows how far you are in the quiz.", "퀴즈를 얼마나 풀었는지 보여줘요."], [".card", "Each question is different: choose, type, listen, speak or match. Score 80% or more!", "문제마다 고르기, 쓰기, 듣기, 말하기, 짝 맞추기가 있어요. 80% 이상을 받아요!"], ['[data-act="quit"]', "Need a break? Tap ✕ to stop.", "쉬고 싶으면 ✕를 눌러요."]],
+  quiz: [[".topbar .bar", "This bar shows how far you are in the quiz.", "퀴즈를 얼마나 풀었는지 보여줘요."], [".card", "Each question is different: choose, type, listen, build sentences, speak or match. Score 80% or more!", "문제마다 고르기, 쓰기, 듣기, 문장 만들기, 말하기, 짝 맞추기가 있어요. 80% 이상을 받아요!"], ['[data-act="quit"]', "Need a break? Tap ✕ to stop.", "쉬고 싶으면 ✕를 눌러요."]],
   coach: [[".card .word", "This is the word for your sentence.", "이 단어로 문장을 만들어요."], [".mic", "Tap the mic and say your own sentence. Make it about your life!", "마이크를 누르고 나만의 문장을 말해요. 내 이야기로 만들어 봐요!"], ["#coachText", "If the app heard you wrong, you can fix the text here.", "앱이 잘못 들었으면 여기서 고칠 수 있어요."], ['[data-act="coachCheck"]', "Check it! The coach fixes mistakes and shows another way to say it.", "확인하면 코치가 고쳐 주고 다른 표현도 알려줘요."]],
   story: [[".story-text", "Read this part of the story. Tap a purple word to hear it.", "이야기를 읽어요. 보라색 단어를 누르면 들을 수 있어요."], ['[data-act="readPara"]', "Tap 🔊 to listen to the part.", "🔊를 누르면 들을 수 있어요."], ['[data-act="storyQs"]', "Then answer the questions. The Korean appears after you answer.", "그다음 문제를 풀어요. 답한 뒤에 한국어가 나와요."]],
   words: [[".list-row", "Tap a word to see its card. The ring fills as you master it.", "단어를 누르면 카드를 볼 수 있어요. 외울수록 동그라미가 채워져요."]],
@@ -1867,6 +1882,7 @@ function defaultSettings(st) { const legacy = !!(st && st.placement && st.placem
   return legacy ? { lang: "ko", textbook: true, tbNew: 12, grNew: 8, review: 10 } : { lang: "ko", textbook: false, tbNew: 12, grNew: 15, review: 10 }; }
 function SET(st) { st = st || ST; return Object.assign(defaultSettings(st), (st && st.settings) || {}); }
 function effCfg(st) { const s = SET(st);
+  if (st && st.course && typeof courseInfo === "function" && courseInfo(st.course)) return Object.assign({}, CFG, { textbook: false, tbNew: 0, grNew: 0, grNewFallback: s.grNew || 15, course: st.course, newPerWeek: 12, reviewPerWeek: s.review, startUnit: s.startUnit || CFG.startUnit });
   return Object.assign({}, CFG, { textbook: !!s.textbook, tbNew: s.textbook ? s.tbNew : 0, grNew: s.grNew, newPerWeek: (s.textbook ? s.tbNew : 0) + s.grNew, reviewPerWeek: s.review, startUnit: s.startUnit || CFG.startUnit }); }
 function studentHome() {
   if (!ST.profile) return "onboard";
@@ -1914,9 +1930,9 @@ function obShell(opt) { const dir = OB_DIR; OB_DIR = 0;
     <div class="ob-screen${anim}"${style}>${opt.body}</div>
     <div class="ob-foot">${opt.foot || ""}<button class="big primary" id="obGo" type="${opt.form ? "submit" : "button"}" ${opt.act ? `data-act="${opt.act}"` : ""} ${opt.disabled ? "disabled" : ""}>${opt.btn}</button></div></${opt.form ? "form" : "div"}>`; }
 function obSteps() { const p = ST.profile || {}; const dob = ST._dob || p.dob || ""; const age = dob ? ageOf({ profile: { dob } }) : null; const kid = age != null && age < 14;
-  return ["name", "dob"].concat(kid ? ["consent"] : []).concat(["lang", "theme", "goal"]); }
+  return ["who", "name", "dob"].concat(kid ? ["consent"] : []).concat(["lang", "theme", "goal"]); }
 function obCanGo() { const st = obSteps()[OB]; const v = id => ((document.getElementById(id) || {}).value || "").trim();
-  if (st === "name") return !!v("obName"); if (st === "dob") return !!(v("obY") && v("obM") && v("obD"));
+  if (st === "who") return !!ST._who; if (st === "name") return !!v("obName"); if (st === "dob") return !!(v("obY") && v("obM") && v("obD"));
   if (st === "consent") return !!(v("obParent") && (document.getElementById("obConsent") || {}).checked);
   if (st === "lang") return !!ST._lang; if (st === "goal") return (ST._goals || []).length > 0; return true; }
 function obReady(typed) { const b = document.getElementById("obGo"); if (b) b.disabled = !obCanGo(); if (typed) mascotWrite(); }
@@ -1932,7 +1948,10 @@ function renderOnboard() {
     $app.innerHTML = `<div class="ob-wrap"><div class="ob-screen" style="animation:none"><div class="ob-hero"><div class="bub">${TL("안녕! 난 <b>Bubbo</b>야.<br>몇 가지만 물어보고 시작할게!", "Hi! I'm <b>Bubbo</b>.<br>A few quick questions and we're off.")}</div><div class="mslot hero" data-sc="1.5" data-act="run" data-key="intro"></div>${UI() === "en" ? "" : `<p class="muted">Hi, I'm Bubbo. A few quick questions and we're off.</p>`}</div></div>
       <div class="ob-foot"><button class="big primary" data-act="obIntroGo">${TLK("next")}</button><p class="muted small" style="text-align:center;margin-top:10px">${TL(`계속하면 <a href="#" data-act="privacy">개인정보 안내</a>에 동의하는 거예요.`, `By continuing, you agree to the <a href="#" data-act="privacy">privacy note</a>.`)}</p></div></div>`; return; }
   let body = "";
-  if (st === "name") body = obAsk("happy", TL("네 이름은 뭐야?", "What's your name?"), UI() === "en" ? "" : "What's your name?") + `<input id="obName" type="text" autocomplete="given-name" value="${esc(name)}" placeholder="${TL("이름 · Your name", "Your name")}" maxlength="30" autofocus data-input="obReady">`;
+  if (st === "who") body = obAsk("happy", TL("누가 영어를<br>배우나요?", "Who's learning<br>English?"), UI() === "en" ? "" : "Who's learning English?") + `<div class="goals">
+      <button type="button" class="goal" data-act="obWho" data-v="kid" aria-pressed="${ST._who === "kid"}" style="min-height:74px"><span style="flex:1;text-align:left"><b>${TL("학생이에요", "A student")}</b><br><span class="muted small">${TL("초·중·고 · 학교 공부", "Elementary to high school")}</span></span><span class="ck"></span></button>
+      <button type="button" class="goal" data-act="obWho" data-v="me" aria-pressed="${ST._who === "me"}" style="min-height:74px"><span style="flex:1;text-align:left"><b>${TL("일반 학습자예요", "A general learner")}</b><br><span class="muted small">${TL("대학생 · 직장인 · 누구나", "College · work · anyone")}</span></span><span class="ck"></span></button></div>`;
+  else if (st === "name") body = obAsk("happy", TL("네 이름은 뭐야?", "What's your name?"), UI() === "en" ? "" : "What's your name?") + `<input id="obName" type="text" autocomplete="given-name" value="${esc(name)}" placeholder="${TL("이름 · Your name", "Your name")}" maxlength="30" autofocus data-input="obReady">`;
   else if (st === "dob") body = obAsk("happy", TL(`반가워, ${esc(name.trim() || "친구")}!<br>생일은 언제야?`, `Nice to meet you, ${esc(name.trim() || "friend")}!<br>When's your birthday?`), TL("When's your birthday? 단어 레벨을 맞추는 데 써요.", "It helps me pick words at your level.")) + dobSelects(dob) + `<input id="obDob" type="hidden" value="${esc(dob)}">${age != null ? `<p class="muted small">${TL(`만 ${age}세`, `Age ${age}`)}</p>` : ""}`;
   else if (st === "consent") body = obAsk("think", TL("부모님께 한 가지만<br>여쭤볼게요.", "One question<br>for a parent."), TL(`${esc(name.trim())}는 만 14세 미만이라 보호자 동의가 필요해요.`, `${esc(name.trim())} is under 14, so a parent or guardian needs to agree.`)) + `<div class="card"><div class="field"><label for="obParent">${TL("보호자 이름 · Parent or guardian", "Parent or guardian's name")}</label><input id="obParent" type="text" value="${esc(ST._parent || "")}" maxlength="40" data-input="obReady"></div>
       <label class="row" style="gap:10px;align-items:flex-start;font-weight:700"><input id="obConsent" type="checkbox" ${ST._consent ? "checked" : ""} style="width:22px;height:22px;flex:none;margin-top:2px" data-change="obReady"><span>${TL(`저는 보호자이며 <a href="#" data-act="privacy">개인정보 안내</a>에 동의합니다. I'm the parent/guardian and I agree to the privacy note.`, `I'm the parent/guardian and I agree to the <a href="#" data-act="privacy">privacy note</a>.`)}</span></label></div>`;
@@ -1958,7 +1977,8 @@ function renderHello() { const nm = firstName() || TL("친구", "friend"); const
     ${s >= 2 ? `<span class="streak-big">🔥 ${s}</span>` : ""}<p class="hl-line">${b}</p><button class="big primary hl-btn" data-act="helloGo">${TL("좋아, 시작! →", "Let's go! →")}</button></div>`; }
 function obNext() {
   stashOnboard(); const p = ST.profile || {}; const dob = ST._dob || p.dob || ""; const age = dob ? ageOf({ profile: { dob } }) : null; const kid = age != null && age < 14;
-  const steps = ["name", "dob"].concat(kid ? ["consent"] : []).concat(["lang", "theme", "goal"]); const st = steps[OB];
+  const steps = obSteps(); const st = steps[OB]; void kid;
+  if (st === "who" && !ST._who) { toast(TL("하나를 골라 줘!", "Pick one!")); return; }
   if (st === "name" && !(ST._name || "").trim()) { toast(TL("이름을 알려 줘!", "Tell me your name!")); return; }
   if (st === "dob") { if (!dob) { toast(TL("생일을 골라 줘!", "Pick your birthday!")); return; } if (age == null || age < 3 || age > 100) { toast(TL("생일을 다시 확인해 줘", "Check your birthday again")); return; } }
   if (st === "consent" && (!ST._consent || !(ST._parent || "").trim())) { toast(TL("보호자 이름과 동의가 필요해요", "A parent's name and agreement are needed")); return; }
@@ -1992,10 +2012,10 @@ function saveOnboard() {
   if (!dob) { toast("Choose your date of birth"); return; }
   const age = ageOf({ profile: { dob } }); if (age == null || age < 3 || age > 100) { toast("Check the date of birth"); return; }
   if (age < 14 && (!ST._consent || !(ST._parent || "").trim())) { toast("A parent needs to type their name and agree"); return; }
-  ST.profile = { name: name.slice(0, 30), dob, at: Date.now() };
+  ST.profile = { name: name.slice(0, 30), dob, at: Date.now() }; if (ST._who === "me") ST.profile.adult = true;
   if (age < 14) ST.consent = { by: ST._parent.trim().slice(0, 40), at: Date.now(), v: 1 }; else ST.consent = { self: true, at: Date.now(), v: 1 };
   ST.settings = Object.assign({}, ST.settings || {}, { lang: ST._lang || (ST.settings && ST.settings.lang) || "ko" }); ST.goals = ST._goals || [];
-  ["_lang", "_dob", "_dobP", "_name", "_consent", "_parent", "_goals"].forEach(k => delete ST[k]); OB = 0; OB_INTRO = true; OB_DIR = 1; OB_UI = true;
+  ["_lang", "_dob", "_dobP", "_name", "_consent", "_parent", "_goals", "_who"].forEach(k => delete ST[k]); OB = 0; OB_INTRO = true; OB_DIR = 1; OB_UI = true;
   saveST(); logDid("profile"); view = { name: studentHome() }; render();
 }
 
@@ -2154,6 +2174,7 @@ function openMenu() {
     ${ST && studentHome() === "tabs" ? `<button class="menu-item" data-act="menuMic">🎤 Sound &amp; microphone</button>` : ""}
     ${!IS_OWNER && ST && ST.profile ? `<button class="menu-item" data-act="menuParent">👨‍👩‍👧 For parents</button><button class="menu-item" data-act="menuSwitch">👥 Switch or add child</button>` : ""}
     <button class="menu-item" data-act="reload">🔄 Reload app</button>
+    ${IS_OWNER && mode === "student" ? `<button class="menu-item" data-act="previewRestartAsk">↺ Start over (test)</button>` : ""}
     ${IS_OWNER ? `<button class="menu-item" data-act="menuSurvey">⭐ Preview parent survey</button>` : ""}
     ${IS_OWNER ? `<button class="menu-item" data-act="toTeacher">📊 Teacher dashboard</button>` : `<button class="menu-item danger" data-act="menuSignout">↩️ Sign out</button>`}</div>`;
   document.body.appendChild(el);
@@ -2419,7 +2440,7 @@ function loaderHtml(first) { clearInterval(window.__ld2); window.__ld2 = setInte
   return `<div class="splash"><div class="loader"><div class="ld-buddy">${buddy("happy", 84)}</div><div class="ld-shadow"></div><p class="ld-msg" id="ldMsg2">${esc(first || LD_MSGS[0])}</p><div class="ld-dots"><i></i><i></i><i></i></div></div></div>`; }
 
 /* ---------- "new version" popup ---------- */
-const APP_VER = "62e66adc14"; let VER_SNOOZE = 0;
+const APP_VER = "ca6140ba2f"; let VER_SNOOZE = 0;
 async function checkVersion() {
   if (Date.now() < VER_SNOOZE || document.getElementById("verPop") || /^__/.test(APP_VER)) return;
   try { const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" }); if (!r.ok) return; const j = await r.json();
@@ -2688,6 +2709,250 @@ function renderBossResult() { const v = view;
     <p style="font-size:30px;margin:0">${v.stars ? "⭐".repeat(v.stars) : ""}</p><p style="opacity:.9">${v.pct}% correct${v.stars ? "" : " · you need 80% to win"}</p></div>
     ${v.missed.length ? `<div class="card"><h3>Words to practice</h3><div class="chips">${v.missed.map(id => `<span class="chip">${esc(BY[id].w)} · ${esc(gloss(BY[id]))}</span>`).join("")}</div><button class="big" data-act="bossPractice">Practice these words</button></div>` : ""}
     <button class="big primary" data-act="toMap">Back to the map</button>`; }
+
+/* ---------- courses: workbook levels (Korean app only) + theme packs ---------- */
+const CX = window.__CX__ || { books: [], themes: [], items: {} };
+const TH_COLOR = { travel: "#3F82F2", business: "#16141D", kitchen: "#F76B15", shopping: "#E5484D", health: "#30A46C", feelings: "#8E4EC6" };
+function courseInfo(c) {
+  if (!c) return null;
+  if (c.type === "wb") { const b = CX.books.find(x => x.id === c.book); const L = b && b.levels.find(l => l.id === c.level); if (!L) return null;
+    return { key: b.id + "." + L.id, title: b.name + " " + L.name, short: L.name, color: L.color, units: L.units, n: L.units.length, unitName: i => "Unit " + (i + 1) }; }
+  if (c.type === "th") { const p = CX.themes.find(x => x.id === c.pack); if (!p) return null;
+    return { key: "th", title: TL(p.ko, p.name), short: TL(p.ko, p.name), color: TH_COLOR[p.id] || "#3F82F2", units: p.units.map(u => u.ids), n: p.units.length, unitName: i => TL(p.units[i].ko, p.units[i].name) }; }
+  return null;
+}
+const wbVisible = () => true; // for now everyone sees the workbooks (any app language)
+const courseLabel = c => { const i = courseInfo(c); return i ? i.short + " · " + i.unitName(Math.max(0, (c.unit || 1) - 1)) : ""; };
+
+/* show the meaning the course teaches: course words take the course's senses, sentences and recordings */
+let CX_APPLIED = [];
+function applyCourse() {
+  CX_APPLIED.forEach(e => { if (e._o) { Object.assign(e, e._o); delete e._o; } delete e.ovPack; }); CX_APPLIED = [];
+  // extra practice data (synonyms, misuse sentences…) for every course word, without changing its meaning
+  Object.keys(CX.items).forEach(k => { const m = CX.items[k]; Object.keys(m).forEach(id => { const e = BY[id]; if (e && !e.cx) e.cx = m[id]; }); });
+  const info = ST && courseInfo(ST.course); if (!info) return;
+  const m = CX.items[info.key] || {};
+  info.units.forEach(ids => ids.forEach(id => { const e = BY[id], it = m[id]; if (!e || !it) return;
+    e._o = { pos: e.pos, ko: e.ko, def: e.def, senses: e.senses, ex: e.ex, posAll: e.posAll, cx: e.cx };
+    Object.assign(e, { pos: it.pos, ko: it.ko, def: it.def, senses: it.senses, ex: it.ex, cx: it, ovPack: it.pk });
+    e.posAll = [...new Set(e.senses.map(x => x.pos))].join(" · "); CX_APPLIED.push(e); }));
+}
+/* new words for this week from the course: the whole unit, one unit a week */
+function courseNewIds(st, words, force) {
+  const c = st.course, info = courseInfo(c); if (!info) return null;
+  let u = Math.max(1, Math.min(info.n, c.unit || 1));
+  if (!force && c.builtFor && c.builtFor !== weekKey() && c.builtUnit === u) u++;
+  for (; u <= info.n; u++) { const ids = info.units[u - 1].filter(id => BY[id] && !(words[id] && words[id].box >= MASTER_BOX));
+    if (ids.length) { c.unit = u; c.builtFor = weekKey(); c.builtUnit = u; delete c.done; return ids; } }
+  c.unit = info.n; c.done = true; c.builtFor = weekKey(); c.builtUnit = info.n; return [];
+}
+function setCourse(c, by) {
+  ST.course = c ? Object.assign({ unit: 1 }, c, { by: by || "me", at: Date.now() }) : null;
+  if (!c) delete ST.course;
+  applyCourse();
+  if (readyForWeeks()) { buildWeek(ST, WORDS, effCfg(ST), true); if (ST.week) { ST.week.unit = ST.course ? ST.course.unit : null; delete ST.week.day; } loadPacksFor(weekIds()); }
+  saveST(); PROG = null;
+}
+/* the teacher changed this student's course: rebuild the week once on the student's phone */
+function courseOnLoad() {
+  applyCourse();
+  if (ST.courseForce && readyForWeeks()) { delete ST.courseForce; buildWeek(ST, WORDS, effCfg(ST), true); if (ST.week) { ST.week.unit = ST.course ? ST.course.unit : null; delete ST.week.day; } saveST(); }
+}
+
+/* ---------- course picker ---------- */
+let CP = { tab: "", book: "vw", level: "", pack: "", unit: 0 };
+function courseCard() {
+  const c = ST.course; const info = courseInfo(c);
+  return `<div class="card" style="gap:10px"><div class="row between"><h3>${TL("내 코스 · My course", "My course")}</h3>${info ? `<span class="pill" style="background:${info.color};color:#fff;border-color:transparent">${esc(info.short)}</span>` : ""}</div>
+    <p class="muted small" style="margin:0">${info ? esc(courseLabel(c)) + (c.by === "teacher" ? TL(" · 선생님이 정해 줬어요", " · set by your teacher") : "") : TL("내 수준에 맞는 단어를 골라 줘요.", "Words picked for your level.")}</p>
+    <button class="big" data-act="coursePick">${TL("코스 바꾸기", "Change course")}</button></div>`;
+}
+function renderCoursePick() {
+  const c = ST.course || {}; const head = `<div class="row between" style="padding-top:14px"><button class="ghost" data-act="${CP.level || CP.pack ? "cpBack" : "cpClose"}" aria-label="Back" style="min-height:40px">‹ ${TL("뒤로", "Back")}</button><span></span></div>`;
+  const row = (act, attrs, title, sub, color, on) => `<button class="goal" data-act="${act}" ${attrs} aria-pressed="${!!on}" style="min-height:70px">${color ? `<i style="width:14px;height:44px;border-radius:7px;background:${color};flex:none"></i>` : ""}<span style="flex:1;text-align:left"><b>${title}</b><br><span class="muted small">${sub}</span></span><span class="ck"></span></button>`;
+  let body = "";
+  if (CP.level || CP.pack) { // unit picker
+    const info = courseInfo(CP.level ? { type: "wb", book: CP.book, level: CP.level } : { type: "th", pack: CP.pack });
+    const cur = (CP.level ? c.type === "wb" && c.level === CP.level : c.type === "th" && c.pack === CP.pack) ? c.unit : 0;
+    const sel = CP.unit || cur || 1; const ids = info.units[sel - 1] || [];
+    body = `<h1 style="margin:4px 0 0">${esc(info.title)}</h1><p class="muted">${TL("유닛을 골라 줘. 일주일에 한 유닛씩 배워요.", "Pick a unit. You learn one unit a week.")}</p>
+      <div style="display:grid;grid-template-columns:repeat(${CP.level ? 6 : 1},minmax(0,1fr));gap:8px">${info.units.map((u, i) => `<button class="opt ${sel === i + 1 ? "sel" : ""}" data-act="cpUnit" data-u="${i + 1}" style="min-height:48px;${CP.level ? "padding:0" : ""}${sel === i + 1 ? `;border-color:${info.color};background:${info.color};color:#fff` : ""}">${CP.level ? i + 1 : esc(info.unitName(i))}${cur === i + 1 ? " •" : ""}</button>`).join("")}</div>
+      <div class="card" style="gap:8px"><b>${esc(info.unitName(sel - 1))} · ${ids.length} ${TL("단어", "words")}</b><div class="chips">${ids.map(id => BY[id] ? `<span class="chip">${esc(BY[id].w)}</span>` : "").join("")}</div></div>
+      <button class="big primary" data-act="cpGo">${TL("이 유닛으로 시작", "Start this unit")}</button>${CP.level ? `<p class="muted small">${TL("이 코스의 뜻풀이와 예문은 Vocaboo가 직접 만들었어요. 출판사와는 관계가 없어요.", "Meanings and sentences are written by Vocaboo. Not affiliated with the publisher.")}</p>` : ""}`;
+  } else {
+    const b = CX.books[0];
+    body = `<h1 style="margin:4px 0 0">${TL("어떤 단어를 배울까?", "What do you want to learn?")}</h1>
+      <div class="goals">${row("cpGrade", "", TL("내 수준에 맞게", "Words for my level"), TL("레벨 테스트 결과에 맞춰 골라 줘요", "Picked from your level test"), "", !ST.course)}</div>
+      ${wbVisible() && b ? `<h3 style="margin:10px 0 0">${TL("워크북 코스", "Workbook courses")}</h3><p class="muted small" style="margin:0">${esc(b.name)}</p><div class="goals">${b.levels.map(L => row("cpLevel", `data-v="${L.id}"`, L.name, `${L.units.length} units · ${L.units[0].length} ${TL("단어씩", "words each")}`, L.color, c.type === "wb" && c.level === L.id)).join("")}</div>` : ""}
+      <h3 style="margin:10px 0 0">${TL("테마 팩", "Theme packs")}</h3><p class="muted small" style="margin:0">${TL("여행, 비즈니스, 생활 영어 · 무료", "Travel, business, everyday English · free")}</p>
+      <div class="goals">${CX.themes.map(p => row("cpPack", `data-v="${p.id}"`, TL(p.ko, p.name), p.units.map(u => TL(u.ko, u.name)).join(" · "), TH_COLOR[p.id], c.type === "th" && c.pack === p.id)).join("")}</div>`;
+  }
+  $app.innerHTML = head + `<div class="stack" style="gap:12px;padding-bottom:30px">${body}</div>`;
+}
+async function courseAct(a, b) {
+  if (a === "coursePick") { document.querySelectorAll(".tour").forEach(x => x.remove()); if (typeof TI !== "undefined") TI = -1; CP = { tab: "", book: "vw", level: "", pack: "", unit: 0 }; view = { name: "coursePick", back: TAB }; scrollTop0(); render(); return true; }
+  if (a === "cpClose") { view = { name: studentHome() }; render(); return true; }
+  if (a === "cpBack") { CP.level = ""; CP.pack = ""; CP.unit = 0; render(); return true; }
+  if (a === "cpLevel") { CP.level = b.dataset.v; CP.pack = ""; CP.unit = 0; scrollTop0(); render(); return true; }
+  if (a === "cpPack") { CP.pack = b.dataset.v; CP.level = ""; CP.unit = 0; scrollTop0(); render(); return true; }
+  if (a === "cpUnit") { CP.unit = +b.dataset.u; render(); return true; }
+  if (a === "cpGrade") { setCourse(null); toast(TL("내 수준에 맞는 단어로 바꿨어요", "Switched to words for your level")); view = { name: studentHome() }; TAB = "today"; render(); return true; }
+  if (a === "cpGo") { const c = CP.level ? { type: "wb", book: CP.book, level: CP.level } : { type: "th", pack: CP.pack }; const info = courseInfo(c);
+    const cur = ST.course && (ST.course.level || ST.course.pack) === (c.level || c.pack) ? ST.course.unit : 0; c.unit = CP.unit || cur || 1;
+    setCourse(c); try { sfx("win"); } catch (e) {} toast(TL(`${info.short} ${info.unitName(c.unit - 1)} 시작!`, `Starting ${info.short} ${info.unitName(c.unit - 1)}!`)); view = { name: studentHome() }; TAB = "today"; scrollTop0(); render(); return true; }
+  if (a === "suCourse") { ST._suCourse = b.dataset.v; OB_DIR = 0; render(); return true; }
+  if (a === "suLevel") { ST._suLevel = b.dataset.v; OB_DIR = 0; render(); return true; }
+  if (a === "tw") { twShow(b); return true; }
+  if (a === "tiAdd" || a === "tiDel") { tileTap(a, +b.dataset.i); return true; }
+  if (a === "tiCheck") { tileCheck(); return true; }
+  if (a === "pledge") { ST.pledge = { days: +b.dataset.v, start: today(), at: Date.now() }; saveST(); try { sfx("win"); } catch (e) {} toast(TL(`${b.dataset.v}일 도전 시작! 🔥`, `${b.dataset.v}-day challenge started! 🔥`)); render(); return true; }
+  if (a === "pledgeLater") { ST.pledgeAskedAt = today(); saveST(); render(); return true; }
+  if (a === "pledgeNew") { delete ST.pledge; delete ST.pledgeAskedAt; saveST(); toast(TL("다음 퀴즈 끝나고 새 목표를 정해요", "Pick a new goal after your next quiz")); render(); return true; }
+  if (a === "obWho") { ST._who = b.dataset.v; OB_DIR = 0; render(); return true; }
+  return false;
+}
+
+/* setup wizard step: what to learn */
+function suCourseStep() {
+  const adult = !!(ST.profile && ST.profile.adult); const v = ST._suCourse || (ST.course ? (ST.course.type === "wb" ? "wb" : "th") : (adult ? "" : "grade"));
+  const opt = (k, t, s) => `<button class="goal" data-act="suCourse" data-v="${k}" aria-pressed="${v === k}" style="min-height:70px"><span style="flex:1;text-align:left"><b>${t}</b><br><span class="muted small">${s}</span></span><span class="ck"></span></button>`;
+  let more = "";
+  if (v === "wb") { const b = CX.books[0]; more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${b.levels.map(L => `<button class="opt ${ST._suLevel === L.id ? "sel" : ""}" data-act="suLevel" data-v="${L.id}" style="min-height:52px;${ST._suLevel === L.id ? `background:${L.color};color:#fff;border-color:${L.color}` : `border-left:8px solid ${L.color}`}">${L.name}</button>`).join("")}</div><p class="muted small">${TL("Unit 1부터 시작해요. 유닛은 나중에 Me → 내 코스에서 바꿀 수 있어요.", "You start at Unit 1. Change units later in Me → My course.")}</p>`; }
+  if (v === "th") more = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">${CX.themes.map(p => `<button class="opt ${ST._suLevel === p.id ? "sel" : ""}" data-act="suLevel" data-v="${p.id}" style="min-height:52px;${ST._suLevel === p.id ? `background:${TH_COLOR[p.id]};color:#fff;border-color:${TH_COLOR[p.id]}` : `border-left:8px solid ${TH_COLOR[p.id]}`}">${TL(p.ko, p.name)}</button>`).join("")}</div>`;
+  return { mood: "think", q: TL("어떤 단어를<br>배울까?", "What do you want<br>to learn?"), sub: UI() === "en" ? "" : "What do you want to learn?",
+    body: `<div class="goals">${opt("grade", TL("내 수준에 맞게", "Words for my level"), TL("방금 본 레벨 테스트에 맞춰 골라 줘요", "Picked from the level test you just took"))}${wbVisible() ? opt("wb", TL("워크북 코스", "Workbook course"), "Vocabulary Workshop · Red · Purple · Green · Orange") : ""}${opt("th", TL("테마 팩", "Theme packs"), TL("여행 · 비즈니스 · 주방 · 쇼핑 · 건강 · 감정", "Travel · Business · Kitchen · Shopping · Health · Feelings"))}</div>${more}`,
+    ok: () => v === "grade" || ((v === "wb" || v === "th") && !!ST._suLevel && (v === "wb" ? CX.books[0].levels.some(L => L.id === ST._suLevel) : CX.themes.some(p => p.id === ST._suLevel))),
+    commit: () => { if (v === "grade") { if (ST.course) setCourse(null); } else { const c = v === "wb" ? { type: "wb", book: "vw", level: ST._suLevel, unit: 1 } : { type: "th", pack: ST._suLevel, unit: 1 };
+      if (!ST.course || (ST.course.level || ST.course.pack) !== ST._suLevel) setCourse(c); } delete ST._suCourse; delete ST._suLevel; } };
+}
+
+/* ---------- tap a word in a sentence to see its meaning ---------- */
+function lemmaId(tok) { const t = tok.toLowerCase().replace(/[^a-z']/g, "").replace(/'s$/, ""); if (!t) return null;
+  const cand = [t, t.replace(/s$/, ""), t.replace(/es$/, ""), t.replace(/ies$/, "y"), t.replace(/ed$/, ""), t.replace(/d$/, ""), t.replace(/ied$/, "y"), t.replace(/ing$/, ""), t.replace(/ing$/, "e"), t.replace(/([a-z])\1(ed|ing)$/, "$1"), t.replace(/er$/, ""), t.replace(/est$/, ""), t.replace(/ly$/, "")];
+  for (const c of cand) if (c && BY[idOf(c)]) return idOf(c); return null; }
+const TW_SKIP = new Set("a an the i you he she it we they me him her us them my your his its our their is am are was were be been to of in on at by for and or but so if as with from this that these those do does did not no yes".split(" "));
+function tapSent(s, target, markTarget) { const tid = target ? idOf(target) : null;
+  return String(s).split(/(\s+)/).map(tok => { if (/^\s+$/.test(tok) || !tok) return tok; const id = lemmaId(tok); const clean = tok.toLowerCase().replace(/[^a-z']/g, "");
+    if (tid && (id === tid || clean.startsWith(target.toLowerCase()))) return markTarget ? `<mark>${esc(tok)}</mark>` : esc(tok);
+    if (!id || TW_SKIP.has(clean)) return esc(tok);
+    return `<span class="tw" data-act="tw" data-id="${id}">${esc(tok)}</span>`; }).join(""); }
+function twShow(el) { document.querySelectorAll(".tw-tip").forEach(x => x.remove()); const e = BY[el.dataset.id]; if (!e) return;
+  const tip = document.createElement("div"); tip.className = "tw-tip"; tip.textContent = KO() ? e.senses[0].ko : e.senses[0].def;
+  document.body.appendChild(tip); const r = el.getBoundingClientRect(); const w = tip.offsetWidth;
+  tip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left + r.width / 2 - w / 2)) + "px"; tip.style.top = (r.bottom + 8) + "px";
+  setTimeout(() => tip.remove(), 2200); }
+document.addEventListener("scroll", () => document.querySelectorAll(".tw-tip").forEach(x => x.remove()), true);
+
+/* ---------- new practice types ---------- */
+Object.assign(TYPE_NAME, { unscr: "Unscramble the sentence", lis_build: "Listen and build the sentence", tr_build: "Translate (Korean → build English)", sense_ctx: "Which meaning?", use_ok: "Used correctly?", syn_mc: "Synonym", ant_mc: "Antonym" });
+["sense_ctx", "use_ok", "syn_mc", "ant_mc"].forEach(t => MC_TYPES.add(t));
+const TILE_T = new Set(["unscr", "lis_build", "tr_build"]);
+const CX_T = new Set(["unscr", "lis_build", "tr_build", "sense_ctx", "use_ok", "syn_mc", "ant_mc"]);
+const wc = s => String(s).trim().split(/\s+/).length;
+function shortEx(e) { let best = -1; (e.ex || []).slice(0, 2).forEach((s, i) => { if (wc(s) <= 11 && (best < 0 || wc(s) < wc(e.ex[best]))) best = i; }); return best; }
+function cxEligible(id) { const e = BY[id]; if (!e) return []; const x = e.cx || {}; const out = [];
+  if (shortEx(e) >= 0) out.push("unscr", "lis_build");
+  if (x.tr && x.tr.en && KO()) out.push("tr_build");
+  if (x.ctx && x.ctx.length >= 2 && e.senses && e.senses.length >= 2) out.push("sense_ctx");
+  if (x.bad && x.bad.length >= 2) out.push("use_ok");
+  if (x.syn && x.syn.length) out.push("syn_mc");
+  if (x.ant && x.ant.length) out.push("ant_mc");
+  return out; }
+function tilesOf(s) { return s.replace(/[.!?]+$/, "").split(/\s+/).filter(Boolean); }
+function makeCxQ(id, t, poolIds) {
+  const e = BY[id], x = e.cx || {}; const q = { id, t };
+  if (TILE_T.has(t)) { let s, tag;
+    if (t === "tr_build") { s = x.tr.en; tag = "t"; }
+    else { const k = shortEx(e); s = e.ex[k]; tag = "e" + k; }
+    q.sent = s; q.tag = tag; q.target = tilesOf(s); q.tiles = shuffle(q.target.map((w, i) => ({ w, i })));
+    if (q.tiles.map(o => o.w).join(" ") === q.target.join(" ")) q.tiles.reverse(); }
+  if (t === "sense_ctx") { const c = x.ctx[Math.floor(Math.random() * x.ctx.length)]; q.sent = c.s; q.sense = c.sense;
+    const opts = e.senses.map((s, k) => ({ id: k === c.sense ? id : "s" + k, label: KO() ? s.ko : s.def }));
+    const d = distract(e, "ko", 1, poolIds)[0]; if (d && opts.length < 3) opts.push({ id: "d", label: KO() ? d.senses[0].ko : d.senses[0].def });
+    q.opts = shuffle(opts); }
+  if (t === "use_ok") { const good = e.ex[2] || e.ex[1] || e.ex[0]; q.opts = shuffle([{ id, label: good }, { id: "b0", label: x.bad[0] }, { id: "b1", label: x.bad[1] }]); }
+  if (t === "syn_mc" || t === "ant_mc") { const list = t === "syn_mc" ? x.syn : x.ant; const ans = list[Math.floor(Math.random() * list.length)];
+    const bad = new Set([e.w, ...(x.syn || []), ...(x.ant || [])].map(s => s.toLowerCase()));
+    const rnd = Array.from({ length: 30 }, () => GRADED[Math.floor(Math.random() * GRADED.length)].w);
+    const pool = shuffle((poolIds || []).filter(p => p !== id && BY[p]).map(p => BY[p].w)).concat(rnd).filter(w => !bad.has(w.toLowerCase()) && !/\s/.test(w));
+    const ds = [...new Set(pool)].slice(0, 3); q.ans = ans; q.opts = shuffle([{ id, label: ans }].concat(ds.map((w, k) => ({ id: "w" + k, label: w })))); }
+  return q;
+}
+/* swap some of the quiz questions for the new kinds, so each word is seen in different ways */
+function cxMix(qs, poolIds) {
+  const order = shuffle(["unscr", "lis_build", "tr_build", "sense_ctx", "use_ok", "syn_mc", "ant_mc"]); let k = 0, swapped = 0; const want = Math.round(qs.length * 0.4);
+  return qs.map(q => { if (swapped >= want || q.t === "match" || q.t === "say_en") return q; if (Math.random() < 0.35) return q;
+    const el = cxEligible(q.id); if (!el.length) return q;
+    for (let n = 0; n < order.length; n++) { const t = order[(k + n) % order.length]; if (el.includes(t)) { k = (k + n + 1) % order.length; swapped++; return makeCxQ(q.id, t, poolIds); } }
+    return q; });
+}
+function cxPrompt(q) {
+  const e = BY[q.id];
+  if (q.t === "unscr") return `<p class="label">${TL("문장을 순서대로 만들어 봐", "Put the sentence in order")}</p><p class="muted small" style="margin:0">${TL("단어", "Word")}: <b>${esc(e.w)}</b> · ${esc(gloss(e))}</p>`;
+  if (q.t === "lis_build") return `<p class="label">${TL("듣고 문장을 만들어 봐", "Listen and build the sentence")}</p><div class="row" style="flex-wrap:nowrap">${spk(q.id, q.tag, TL("듣기", "Play"), "big primary icon-l")}<button class="icon-l" data-act="say" data-text="${esc(q.sent)}" data-rate="0.6">${ICON_SPK} ${TL("천천히", "Slow")}</button></div>`;
+  if (q.t === "tr_build") return `<p class="label">${TL("영어로 만들어 봐", "Build it in English")}</p><div class="ex"><p style="font-size:20px;font-weight:700;margin:0" lang="ko">${esc(e.cx.tr.ko)}</p></div>`;
+  if (q.t === "sense_ctx") return `<p class="label">${TL("이 문장에서는 무슨 뜻일까?", "What does it mean in this sentence?")}</p><div class="ex"><p style="font-size:20px;font-weight:700;margin:0">${tapSent(q.sent, e.w, true)}</p></div>`;
+  if (q.t === "use_ok") return `<p class="label">${TL("바르게 쓴 문장을 골라 봐", "Which sentence uses it correctly?")}</p><div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div>${spk(e.id, "w")}</div>`;
+  if (q.t === "syn_mc") return `<p class="label">${TL("뜻이 비슷한 단어는?", "Which word means almost the same?")}</p><div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div>${spk(e.id, "w")}</div>`;
+  if (q.t === "ant_mc") return `<p class="label">${TL("뜻이 반대인 단어는?", "Which word means the opposite?")}</p><div class="row between" style="flex-wrap:nowrap"><div class="word" style="${wsz(e.w)}">${esc(e.w)}</div>${spk(e.id, "w")}</div>`;
+  return "";
+}
+function tileBody(q) { const built = RUN.built || []; const used = new Set(built);
+  const line = built.map((ti, k) => { const o = q.tiles[ti]; const c = RUN.answered ? (RUN.ok ? "right" : "") : ""; return `<button class="wtile ${c}" data-act="tiDel" data-i="${k}" ${RUN.answered ? "disabled" : ""}>${esc(o.w)}</button>`; }).join("");
+  const bank = q.tiles.map((o, i) => `<button class="wtile ${used.has(i) ? "ghosted" : ""}" data-act="tiAdd" data-i="${i}" ${used.has(i) || RUN.answered ? "disabled" : ""}>${esc(o.w)}</button>`).join("");
+  return `<div class="tile-line">${line || `<span class="muted small">${TL("아래 단어를 눌러 봐", "Tap the words below")}</span>`}</div><div class="tile-bank">${bank}</div>
+    ${RUN.answered ? "" : `<button class="big primary" data-act="tiCheck" ${built.length === q.tiles.length ? "" : "disabled"}>${TL("확인", "Check")}</button><button type="button" class="ghost" data-act="idk" style="align-self:center">${TL("모르겠어", "I don't know")}</button>`}`; }
+function tileTap(a, i) { if (!RUN || RUN.answered) return; RUN.built = RUN.built || [];
+  if (a === "tiAdd") { if (!RUN.built.includes(i)) RUN.built.push(i); try { sfx("pop"); } catch (e) {} } else RUN.built.splice(i, 1); render(); }
+function tileCheck() { const q = RUN.qs[RUN.i]; const got = (RUN.built || []).map(ti => q.tiles[ti].w).join(" "); const ok = norm(got).replace(/[,;:]/g, "") === norm(q.target.join(" ")).replace(/[,;:]/g, "");
+  RUN.ok = ok; RUN.answered = true; RUN.lastAns = got; RUN.combo = ok ? (RUN.combo || 0) + 1 : 0;
+  if (ok) { RUN.right++; award(10, "answer"); sfx("good"); } else sfx("bad");
+  record(q.id, q.t, ok, got, Date.now() - RUN.t0); if (q.t !== "tr_build" || ok) speak(q.id, q.tag); render(); }
+function tileFb(q) { const e = BY[q.id];
+  return RUN.ok ? `<div class="fb good">${TL("정답!", "Correct!")} <span>${tapSent(q.sent, e.w, true)}</span></div>`
+    : `<div class="fb bad stack" style="gap:6px"><span>${TL("정답", "Answer")}: <b>${esc(q.sent)}</b></span>${q.t === "tr_build" ? `<span class="muted small" lang="ko">${esc(e.cx.tr.ko)}</span>` : ""}</div>`; }
+function cxFb(q) { const e = BY[q.id];
+  if (q.t === "use_ok") { const good = q.opts.find(o => o.id === q.id).label; return `<div class="fb ${RUN.ok ? "good" : "bad"} stack" style="gap:6px"><span>${RUN.ok ? TL("정답!", "Correct!") : TL("바른 문장은:", "The correct one:")} ${tapSent(good, e.w, true)}</span><span class="muted small">${esc(e.w)} = ${esc(gloss(e))}</span></div>`; }
+  if (q.t === "sense_ctx") { const s = e.senses[q.sense]; return `<div class="fb ${RUN.ok ? "good" : "bad"}">${RUN.ok ? TL("정답!", "Correct!") : TL("이 문장에서는:", "Here it means:")} <b>${esc(KO() ? s.ko : s.def)}</b></div>`; }
+  if (q.t === "syn_mc" || q.t === "ant_mc") { const x = e.cx; return `<div class="fb ${RUN.ok ? "good" : "bad"} stack" style="gap:4px"><span>${RUN.ok ? TL("정답!", "Correct!") : TL("정답은", "The answer is")} <b>${esc(q.ans)}</b></span><span class="muted small">${esc(e.w)} ≈ ${esc((x.syn || []).join(", "))}${(x.ant || []).length ? " · ↔ " + esc(x.ant.join(", ")) : ""}</span></div>`; }
+  return ""; }
+const prevMistake = id => { const w = WORDS[id]; return !!(w && w.hist && w.hist.length && w.hist[w.hist.length - 1][0] === "0"); };
+const prevTag = q => RUN && RUN.kind !== "placement" && prevMistake(q.id) ? `<span class="prev-tag">↻ ${TL("지난번에 틀린 단어", "Previous mistake")}</span>` : "";
+const comboTag = () => RUN && (RUN.combo || 0) >= 3 ? `<span class="combo ${RUN.combo >= 8 ? "hot" : ""}">COMBO × ${RUN.combo}</span>` : "";
+
+/* ---------- streak pledge ---------- */
+function pledgeAsk() { if (ST.pledge || ST.pledgeAskedAt === today() || !ST.lastQuizDay) return "";
+  return `<div class="card" style="gap:10px"><b>${TL("매일 연습할 수 있어? 🔥", "Can you practice every day? 🔥")}</b><p class="muted small" style="margin:0">${TL("목표를 정하면 끝까지 갈 확률이 훨씬 높아져요.", "Setting a goal makes you much more likely to keep going.")}</p>
+    <div class="goals">${[[7, "가볍게", "Easy"], [14, "꾸준히", "Steady"], [30, "도전!", "Challenge"]].map(([d, k, en]) => `<button class="goal" data-act="pledge" data-v="${d}"><b style="font-family:var(--f-display);font-size:20px;width:64px">${TL(d + "일", d + " days")}</b>${TL(k, en)}<span class="ck"></span></button>`).join("")}</div>
+    <button class="ghost" data-act="pledgeLater">${TL("나중에", "Later")}</button></div>`; }
+function pledgeCard() { const p = ST.pledge; if (!p) return ""; const s = streakNow(); const n = Math.min(p.days, s);
+  if (n >= p.days && !p.done) { p.done = today(); award(50, "pledge"); saveST(); setTimeout(() => toast(TL(`${p.days}일 도전 성공! 🏆`, `${p.days}-day goal done! 🏆`)), 400); }
+  const dots = Array.from({ length: Math.min(p.days, 7) }, (_, i) => { const on = p.days <= 7 ? i < n : i < Math.round(n / p.days * 7); return `<i style="width:22px;height:22px;border-radius:50%;background:${on ? "#FFB020" : "var(--soft)"};display:inline-block"></i>`; }).join("");
+  return `<div class="card row between" style="gap:10px;flex-wrap:nowrap;padding:12px 14px"><div class="stack" style="gap:6px"><b class="small">${p.done ? TL(`${p.days}일 도전 성공 🏆`, `${p.days}-day goal done 🏆`) : TL(`${p.days}일 도전 · ${n}/${p.days}`, `${p.days}-day goal · ${n}/${p.days}`)}</b><span class="row" style="gap:6px">${dots}</span></div>${p.done ? `<button class="ghost small" data-act="pledgeNew">${TL("새 목표", "New goal")}</button>` : ""}</div>`; }
+
+/* ---------- teacher: set a student's course, or the whole class's ---------- */
+function courseOptions(cur) { const v = cur ? (cur.type === "wb" ? "wb:" + cur.book + ":" + cur.level : "th:" + cur.pack) : "";
+  const o = (val, lab) => `<option value="${val}" ${v === val ? "selected" : ""}>${esc(lab)}</option>`;
+  return o("", "Graded list (by level test)") + CX.books.map(b => `<optgroup label="${esc(b.name)}">${b.levels.map(L => o("wb:" + b.id + ":" + L.id, b.name + " · " + L.name + " (" + L.units.length + " units)")).join("")}</optgroup>`).join("")
+    + `<optgroup label="Theme packs">${CX.themes.map(p => o("th:" + p.id, p.name + " (" + p.units.length + " units)")).join("")}</optgroup>`; }
+function parseCourse(val, unit) { if (!val) return null; const p = val.split(":"); const c = p[0] === "wb" ? { type: "wb", book: p[1], level: p[2] } : { type: "th", pack: p[1] };
+  const info = courseInfo(c); if (!info) return null; c.unit = Math.max(1, Math.min(info.n, +unit || 1)); return c; }
+function stuCourseHtml(st) { const c = st.course; const info = courseInfo(c);
+  return `<div class="card"><h3>Course</h3><div class="grid2"><div class="field"><label for="sCourse">Words come from</label><select id="sCourse">${courseOptions(c)}</select></div>
+    <div class="field"><label for="sUnit">Unit (this week)</label><input id="sUnit" type="number" min="1" max="20" value="${c ? c.unit || 1 : 1}"></div></div>
+    <p class="muted small">${info ? `Now: <b>${esc(info.title)} · ${esc(info.unitName((c.unit || 1) - 1))}</b>${c.by === "teacher" ? " (set by you)" : " (chosen in the app)"}. One unit a week; it moves to the next unit automatically each week.` : "Using the graded list."} Saving a new course or unit starts that unit right away on her phone.</p></div>`; }
+function stuCourseSave(st) { const el = document.getElementById("sCourse"); if (!el) return; const c = parseCourse(el.value, document.getElementById("sUnit").value); const old = st.course;
+  const same = (!c && !old) || (c && old && c.type === old.type && (c.level || c.pack) === (old.level || old.pack) && c.unit === old.unit); if (same) return;
+  if (c) st.course = Object.assign(c, { by: "teacher", at: Date.now() }); else delete st.course; st.courseForce = true; }
+function classCourseHtml() { const reals = T.students.filter(s => !s.test && !s.rejected && s.approved !== false);
+  return `<div class="card"><h2>Class course</h2><p class="muted small">Put every student on the same workbook unit (for example, the unit you're teaching this week). Each student can still be changed on their own page.</p>
+    <div class="grid2"><div class="field"><label for="ccCourse">Course</label><select id="ccCourse">${courseOptions({ type: "wb", book: "vw", level: "orange" })}</select></div><div class="field"><label for="ccUnit">Unit</label><input id="ccUnit" type="number" min="1" max="20" value="1"></div></div>
+    <div class="row"><button class="primary" data-act="classCourse">Apply to all ${reals.length} students</button></div></div>`; }
+async function classCourse() { const c = parseCourse(document.getElementById("ccCourse").value, document.getElementById("ccUnit").value);
+  const reals = T.students.filter(s => !s.test && !s.rejected && s.approved !== false); if (!reals.length) { toast("No students yet"); return; }
+  if (!confirm(`Set ${reals.length} students to ${c ? courseInfo(c).title + " · " + courseInfo(c).unitName(c.unit - 1) : "the graded list"}?`)) return;
+  for (const s of reals) { const d = (await db.doc("students/" + s._id).get()).data(); if (!d) continue; if (c) d.course = Object.assign({}, c, { by: "teacher", at: Date.now() }); else delete d.course; d.courseForce = true; await setDoc("students/" + s._id, d); }
+  toast("Class course set"); await loadTeacher(); }
 let T = { students: [], sel: null, data: null, tab: "week", week: null, names: {}, view: "list", q: "", sort: "name" };
 async function loadTeacher() {
   let list = await getAll("students");
@@ -2780,7 +3045,7 @@ async function saveStu() {
   st.settings = Object.assign({}, st.settings || {}, { lang: v("sLang"), textbook: v("sTb") === "1", tbNew: n("sTbNew", 0, 40), startUnit: n("sStart", 1, 30), grNew: n("sGrNew", 0, 40), review: n("sRev", 0, 30), kor: v("sKor") === "1", speak: v("sSpeak") === "1" });
   if (v("sGoal") !== "") st.goal = Object.assign({}, st.goal || { from: st.level ? st.level.g : 0 }, { g: n("sGoal", 0, 13), by: v("sGoalBy") || addDays(today(), 182), auto: false });
   if (v("sLevel") !== "" && st.level && Math.abs(+v("sLevel") - st.level.g) > 0.04) { const g = n("sLevel", 0, 13); st.level = Object.assign({}, st.level, { g, lo: Math.max(0, g - 0.3), hi: Math.min(13, g + 0.3), set: "teacher" }); }
-  st.quizSize = n("cfgSize", 5, 30);
+  st.quizSize = n("cfgSize", 5, 30); stuCourseSave(st);
   await setDoc("students/" + T.sel, st); toast("Plan saved"); render();
 }
 
@@ -2979,7 +3244,7 @@ function levelHtml() {
 }
 function stuSettingsHtml() {
   const st = T.data && T.data.st; if (!st) return ""; const s = SET(st); const nm = studentLabel(T.students.find(x => x._id === T.sel));
-  return `<div class="card"><h2>${esc(nm)}: study plan</h2>
+  return stuCourseHtml(st) + `<div class="card"><h2>${esc(nm)}: study plan</h2>
   <div class="grid2">
    <div class="field"><label for="sLang">Word meanings</label><select id="sLang"><option value="ko" ${s.lang !== "en" ? "selected" : ""}>English + Korean</option><option value="en" ${s.lang === "en" ? "selected" : ""}>English only</option></select></div>
    <div class="field"><label for="sTb">Textbook words</label><select id="sTb"><option value="1" ${s.textbook ? "selected" : ""}>On</option><option value="0" ${s.textbook ? "" : "selected"}>Off (graded list only)</option></select></div>
@@ -3005,7 +3270,7 @@ function betaHtml() { const B = T.beta || {};
   <div class="field"><label for="bCap">Free spots</label><input id="bCap" type="number" min="0" max="10000" value="${B.cap != null ? B.cap : 50}"></div></div>
   <p><b>${B.count || 0}</b> of ${B.cap != null ? B.cap : 50} spots used.</p><div class="row"><button class="primary" data-act="saveBeta">Save</button></div></div>`; }
 function settingsHtml() {
-  return betaHtml() + `<div class="card"><h2>Settings for everyone</h2>
+  return classCourseHtml() + betaHtml() + `<div class="card"><h2>Settings for everyone</h2>
   <div class="grid2">
    <input id="cfgStart" type="hidden" value="${CFG.startUnit}"><input id="cfgNew" type="hidden" value="${CFG.newPerWeek}"><input id="cfgRev" type="hidden" value="${CFG.reviewPerWeek}">
    <div class="field"><label for="cfgPass">Pass mark for the daily quiz (%)</label><input id="cfgPass" type="number" min="50" max="100" value="${CFG.passPct}"></div>
@@ -3020,6 +3285,7 @@ function settingsHtml() {
 /* ---------- events ---------- */
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-act]"); if (!b) return; const a = b.dataset.act;
+  if (await courseAct(a, b)) return;
   if (a === "obGoal" || a === "obLang" || a === "obUi" || a === "suWords" || a === "setTheme" || a === "flFace" || a === "pickKid") try { sfx("pop"); } catch (e) {}
   if (a === "speak") { speak(b.dataset.id, b.dataset.tag); return; }
   if (a === "say") { say(b.dataset.text, b.dataset.rate ? +b.dataset.rate : undefined); return; }
@@ -3111,7 +3377,7 @@ document.addEventListener("click", async ev => {
   if (a === "levelDone" && view.fromHome) { TAB = view.back || "today"; view = { name: "tabs" }; scrollTop0(); return render(); }
   if (a === "levelDone" && !ST.setupDone && studentHome() === "tabs") { SU = 0; view = { name: "setup" }; scrollTop0(); return render(); }
   if (a === "levelDone") { TAB = "today"; view = { name: studentHome() }; scrollTop0(); return render(); }
-  if (a === "suNext") { SU++; OB_DIR = 1; render(); return mascotNext(); }
+  if (a === "suNext") { if (SU === 0 && SU_STEP0 && SU_STEP0.commit) SU_STEP0.commit(); SU++; OB_DIR = 1; render(); return mascotNext(); }
   if (a === "suBack") { SU--; OB_DIR = -1; return render(); }
   if (a === "suWords") return suWords(+b.dataset.v);
   if (a === "suDone") { ST.setupDone = Date.now(); saveST(); TAB = "today"; view = { name: "tabs" }; scrollTop0(); return render(); }
@@ -3220,6 +3486,10 @@ document.addEventListener("click", async ev => {
   // teacher
   if (a === "toTeacher") { mode = "teacher"; clearInterval(hbTimer); SESSION = null; await loadTeacher(); return; }
   if (a === "preview") return enterPreview();
+  if (a === "classCourse") return classCourse();
+  if (a === "previewRestartAsk") { closeMenu(); return previewRestartAsk(); }
+  if (a === "previewRestartNo") { const r = document.getElementById("prevAsk"); if (r) r.remove(); return; }
+  if (a === "previewRestart") return previewRestart();
   if (a === "refresh") { $app.innerHTML = loaderHtml("Refreshing… 🔄"); await loadTeacher(); toast("Updated"); return; }
   if (a === "ttab") { T.tab = b.dataset.tab; return render(); }
   if (a === "wkPrev" || a === "wkNext") { const ks = weekOptions(); const i = ks.indexOf(T.week) + (a === "wkPrev" ? 1 : -1); if (ks[i]) T.week = ks[i]; return render(); }
@@ -3258,6 +3528,26 @@ document.addEventListener("change", async ev => {
   if (ev.target.dataset.change === "tSort") { T.sort = ev.target.value; return render(); }
   if (ev.target.dataset.change === "voice") { MYV = VOICES.find(v => v.name === ev.target.value) || MYV; try { localStorage.setItem("ww_voice", MYV.name); } catch (e) {} say("Hello! This is how your words will sound."); } });
 async function enterPreview() { mode = "student"; SID = ME; TAB = "today"; await loadStudent(true); }
+/* teacher only: wipe the test student and replay the app exactly like a brand-new child (splash → language → Bubbo intro → …) */
+function previewRestartAsk() {
+  const old = document.getElementById("prevAsk"); if (old) old.remove();
+  const el = document.createElement("div"); el.className = "cel"; el.id = "prevAsk";
+  el.innerHTML = `<div class="cel-card" style="text-align:left"><h2>Start over?</h2><p>The app restarts from the very first screen, just like a new child opening it. Your test words and progress are erased.</p><p class="small muted">Real students are not affected.</p>
+    <button class="big primary" data-act="previewRestart">Start from the beginning</button><button class="big" data-act="previewRestartNo">Cancel</button></div>`;
+  document.body.appendChild(el);
+}
+async function previewRestart() {
+  if (!IS_OWNER) return;
+  const el = document.getElementById("prevAsk"); if (el) el.innerHTML = `<div class="cel-card"><h2>Resetting…</h2><p class="muted">One moment.</p></div>`;
+  try {
+    clearInterval(hbTimer); SESSION = null; leaveActivity();
+    const ref = db.doc("students/" + ME); const cur = await ref.get();
+    const keep = cur.exists ? cur.data() : { test: true }; keep.test = true; delete keep.settings; // forget language + meanings too
+    await wipeStudent(ME, keep);
+    try { localStorage.removeItem("vb_ui"); localStorage.removeItem("vb_theme"); sessionStorage.setItem("vb_fresh", "1"); } catch (e) {}
+    location.reload();
+  } catch (e) { console.error(e); if (el) el.remove(); toast("Couldn't reset: " + (e.code || e.message)); }
+}
 
 /* ---------- login ---------- */
 function renderLogin() {
@@ -3305,6 +3595,7 @@ async function loadStudent(test) {
   const words = await getAll(sPath() + "/words"); WORDS = {}; words.forEach(w => { const id = w._id; delete w._id; WORDS[id] = w; });
   if (!ST.weekAnchor && ST.week && !SET().textbook) { ST.weekAnchor = ST.week.key; await saveST(); } // keep the current week as it is
   WK_ANCHOR = SET().textbook ? null : (ST.weekAnchor || null);
+  courseOnLoad();
   if (readyForWeeks()) {
     const atts = ST.sizeCheckedFor === addDays(weekKey(), -7) ? [] : await getAll(sPath() + "/attempts");
     const changed = buildWeek(ST, WORDS, effCfg(ST), false); growQuiz(ST, atts);
@@ -3331,7 +3622,9 @@ async function boot() { try { applyTheme(); } catch (e) {}
       if (!WW.teacherUid || /PASTE/.test(WW.teacherUid)) throw new Error("Setup isn't finished. Your User UID is " + u.uid + ". Paste it into config.js as teacherUid, upload config.js again, then reload.");
       const c = await db.doc("config/main").get(); if (c.exists) CFG = Object.assign({}, DEFAULT_CFG, c.data());
       SID = ME;
-      if (IS_OWNER) { mode = "teacher"; await loadTeacher(); }
+      let fresh = false; try { fresh = sessionStorage.getItem("vb_fresh") === "1"; sessionStorage.removeItem("vb_fresh"); } catch (e) {}
+      if (IS_OWNER && fresh) await enterPreview();
+      else if (IS_OWNER) { mode = "teacher"; await loadTeacher(); }
       else { mode = "student"; await startFamily(false); }
     } catch (e) { console.error(e); mode = "student"; view = { name: "error", msg: /permission/i.test(e.code || e.message || "") ? "The database refused access. Check the Firestore rules step in the setup guide." : (e.message || String(e)) }; render(); }
     await splashOff(); const h = document.querySelector(".hello.wait"); if (h) h.classList.remove("wait"); try { MASCOT.key = ""; mascotSync(true); } catch (e) {}

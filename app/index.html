@@ -542,6 +542,24 @@ mark{text-decoration-color:var(--accent)}
 .steps-list .st b{width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;flex:none;font-family:var(--f-display)}
 .opt-list{display:grid;gap:8px}
 @media (prefers-reduced-motion: reduce){.ob-screen,.bb-pop,.goal,.theme-sw,.hello *{animation-duration:.01s!important;animation-delay:0s!important}}
+
+/* v27: sentence tiles, combo, previous mistake, tap-for-meaning, course pill */
+.opt{padding-top:10px;padding-bottom:10px;line-height:1.3}
+.tile-line{min-height:64px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;padding:10px 0 12px;border-bottom:2px solid var(--line);margin-bottom:6px}
+.tile-bank{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:8px 0 4px}
+.wtile{min-height:46px;padding:0 14px;border-radius:14px;border:2px solid var(--line);border-bottom-width:4px;background:#fff;font:inherit;font-size:18px;font-weight:700;color:var(--ink)}
+.wtile.ghosted{background:var(--soft);color:transparent;border-color:var(--soft)}
+.wtile.right{border-color:var(--mint);color:var(--mint-ink);background:var(--mint-soft)}
+.wtile:active{transform:translateY(2px);border-bottom-width:2px}
+.combo{display:inline-block;font-family:var(--f-mono);font-weight:800;font-size:13px;letter-spacing:.08em;color:#1F8FFF;animation:comboPop .35s ease;white-space:nowrap}
+.combo.hot{color:#FF7A1A}
+@keyframes comboPop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.prev-tag{align-self:flex-start;font-size:12px;font-weight:800;letter-spacing:.04em;color:#C25E00;background:#FFF1DE;border-radius:999px;padding:4px 10px}
+.tw{border-bottom:2px dotted rgba(0,0,0,.28);cursor:pointer}
+.tw-tip{position:fixed;z-index:80;max-width:260px;background:var(--ink);color:#fff;font-size:15px;font-weight:600;padding:8px 12px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);pointer-events:none;animation:comboPop .2s ease}
+.course-pill{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:0 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--card,#fff);font:inherit;font-weight:700;font-size:15px;color:var(--ink);text-align:left}
+.course-pill i{width:12px;height:12px;border-radius:4px;background:var(--cc);flex:none}
+.course-pill span{margin-left:auto;opacity:.5}
 </style>
 </head>
 <body>
@@ -553,8 +571,9 @@ mark{text-decoration-color:var(--accent)}
 <div id="toast" class="toast" hidden></div>
 <script src="config.js?v=3e8cab0bd4"></script>
 <script src="words.js?v=d28539be18"></script>
+<script src="courses.js?v=3b8a60c1a1"></script>
 <script src="stories.js?v=453278059e"></script>
-<script src="app.js?v=edb99ad472"></script>
+<script src="app.js?v=68601c9273"></script>
 <script type="module" src="fb.js?v=64ffe6dd4f"></script>
 </body>
 </html>
